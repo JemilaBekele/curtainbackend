@@ -132,6 +132,21 @@ const checkoutCart = catchAsync(async (req, res) => {
     sell: result.sell,
   });
 });
+const convertOrderToCart = catchAsync(async (req, res) => {
+  const userId = req.user.id;
+
+  const result = await cartService.convertOrderToCart(
+    req.params.sellId,
+    userId,
+  );
+
+  res.status(httpStatus.OK).send({
+    success: true,
+    message: result.message,
+    cart: result.cart,
+    originalOrder: result.originalOrder,
+  });
+});
 
 // Clear cart (remove all items)
 const clearCart = catchAsync(async (req, res) => {
@@ -333,6 +348,7 @@ const getCartWaitlists = catchAsync(async (req, res) => {
 // (getWaitlistCarts, removeFromWaitlist with cartId - these were from the old implementation)
 
 module.exports = {
+  convertOrderToCart,
   getCart,
   getCartByUser,
   getCartByUserId,

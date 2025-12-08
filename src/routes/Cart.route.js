@@ -86,12 +86,18 @@ router.delete(
 
 // Cart Operations Routes
 
-// Checkout cart
+// Checkout cart convertOrderToCart
 router.post(
   '/api/carts/:cartId/checkout',
   auth,
   // checkPermission('CHECKOUT_CART'),
   cartController.checkoutCart,
+);
+router.post(
+  '/api/carts/convert/:sellId/OrderToCart',
+  auth,
+  // checkPermission('CHECKOUT_CART'),
+  cartController.convertOrderToCart,
 );
 
 // Clear cart (remove all items)

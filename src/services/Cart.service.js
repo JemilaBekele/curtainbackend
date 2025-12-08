@@ -881,7 +881,6 @@ const checkoutCart = async (cartId, checkoutData, userId) => {
         quantity: item.quantity,
         unitPrice: item.unitPrice,
       };
-      console.log(`  Item ${index + 1}:`, itemData);
       return {
         ...itemData,
         product: item.product,
@@ -909,6 +908,156 @@ const checkoutCart = async (cartId, checkoutData, userId) => {
     sell,
     message: 'Cart checked out successfully and converted to sale',
   };
+};
+const convertOrderToCart = async (sellId, userId) => {
+  // Get user with branch information
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { branch: true },
+  });
+
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
+  }
+
+  // Fetch sell with all necessary relations
+  const sell = await prisma.sell.findUnique({
+    where: { id: sellId },
+    include: {
+      customer: true,
+      items: {
+        include: {
+          shop: true,
+          product: {
+            include: {
+              category: true,
+              unitOfMeasure: true,
+            },
+          },
+          unitOfMeasure: true,
+          batches: true, // Include batches for stock reversal if needed
+        },
+      },
+    },
+  });
+
+  if (!sell) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Order not found');
+  }
+
+  // Validation checks
+  if (sell.locked) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'Cannot convert locked order to cart',
+    );
+  }
+
+  // Check if sell status is allowed for conversion
+  const allowedStatuses = ['PENDING', 'APPROVED', 'NOT_APPROVED'];
+  if (!allowedStatuses.includes(sell.saleStatus)) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      `Order with status ${sell.saleStatus} cannot be converted to cart. Only pending or approved orders can be converted.`,
+    );
+  }
+
+  // Check if this order already has an associated cart
+  const existingCart = await prisma.addToCart.findFirst({
+    where: {
+      customerId: sell.customerId,
+      isCheckedOut: false,
+      OR: [
+        { notes: { contains: `Converted from order: ${sell.invoiceNo}` } },
+        { notes: { contains: sellId } },
+      ],
+    },
+  });
+
+  if (existingCart) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'A cart already exists for this order conversion',
+    );
+  }
+
+  // IMPORTANT: If the sell has affected stock (batches), you might want to reverse stock transactions
+  // This depends on your business logic
+  if (sell.items.some((item) => item.batches && item.batches.length > 0)) {
+    console.log(
+      'Warning: This order has batch transactions that may need to be reversed',
+    );
+    // Optional: Add stock reversal logic here
+    // await reverseStockTransactions(sell.items);
+  }
+
+  // Start a transaction to ensure data consistency
+  return prisma.$transaction(async (prisma) => {  // REMOVED: await
+    // Create a new cart from the sell
+    const newCart = await prisma.addToCart.create({
+      data: {
+        userId,
+        branchId: user.branchId,
+        customerId: sell.customerId,
+        totalItems: sell.totalProducts,
+        totalAmount: sell.grandTotal,
+        isCheckedOut: false,
+        isWaitlist: false,
+        notes: `Converted from order: ${sell.invoiceNo} (Original Status: ${sell.saleStatus})`,
+        createdById: userId,
+        updatedById: userId,
+        items: {
+          create: sell.items.map((item) => ({
+            shopId: item.shopId,
+            productId: item.productId,
+            unitOfMeasureId: item.unitOfMeasureId,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            totalPrice: item.totalPrice,
+            notes: item.itemSaleStatus
+              ? `Previous item status: ${item.itemSaleStatus}`
+              : null,
+            isWaitlist: false,
+            createdById: userId,
+            updatedById: userId,
+          })),
+        },
+      },
+      include: {
+        customer: true,
+        items: {
+          include: {
+            shop: true,
+            product: {
+              include: {
+                category: true,
+                unitOfMeasure: true,
+              },
+            },
+            unitOfMeasure: true,
+          },
+        },
+      },
+    });
+
+    // Delete the sell and all related records
+    // Note: This will cascade delete sell items and their batches based on your schema relations
+    await prisma.sell.delete({
+      where: { id: sellId },
+    });
+
+    return {
+      cart: newCart,
+      originalOrder: {
+        invoiceNo: sell.invoiceNo,
+        saleStatus: sell.saleStatus,
+        grandTotal: sell.grandTotal,
+        totalProducts: sell.totalProducts,
+      },
+      message:
+        'Order successfully converted to cart and original order deleted',
+    };
+  });
 };
 
 // Update the service function signature
@@ -1156,7 +1305,6 @@ const clearWaitlist = async (cartId) => {
 
 // Get waitlists by user
 const getWaitlistsByUser = async (userId, filters = {}) => {
-  console.log('🔍 getWaitlistsByUser called with:', { userId, filters });
 
   const { startDate, endDate, includeNoCustomer = false } = filters;
 
@@ -1171,12 +1319,9 @@ const getWaitlistsByUser = async (userId, filters = {}) => {
     if (startDate) whereClause.createdAt.gte = new Date(startDate);
     if (endDate) whereClause.createdAt.lte = new Date(endDate);
   }
-
-  console.log('📝 Prisma where clause:', JSON.stringify(whereClause, null, 2));
-
   try {
     // First, let's see what's in the database without includes
-    const rawWaitlists = await prisma.waitlist.findMany({
+    await prisma.waitlist.findMany({
       where: whereClause,
       orderBy: { createdAt: 'desc' },
       select: {
@@ -1188,19 +1333,6 @@ const getWaitlistsByUser = async (userId, filters = {}) => {
         cartId: true,
       },
     });
-
-    console.log(
-      '📊 Raw waitlists from DB:',
-      JSON.stringify(rawWaitlists, null, 2),
-    );
-    console.log(
-      '📊 Waitlists with cartItemId:',
-      rawWaitlists.filter((w) => w.cartItemId).length,
-    );
-    console.log(
-      '📊 Waitlists without cartItemId:',
-      rawWaitlists.filter((w) => !w.cartItemId).length,
-    );
 
     // Now get full data with includes
     const waitlists = await prisma.waitlist.findMany({
@@ -1225,17 +1357,8 @@ const getWaitlistsByUser = async (userId, filters = {}) => {
       },
     });
 
-    console.log('✅ Found waitlists with includes:', waitlists.length);
-
     // Detailed logging for each waitlist
     waitlists.forEach((waitlist, index) => {
-      console.log(`\n📋 Waitlist ${index + 1}:`);
-      console.log(`   ID: ${waitlist.id}`);
-      console.log(`   cartItemId: ${waitlist.cartItemId}`);
-      console.log(`   cartItem exists: ${!!waitlist.cartItem}`);
-      console.log(`   Note: ${waitlist.note}`);
-      console.log(`   Cart ID: ${waitlist.cartId}`);
-
       if (waitlist.cartItem) {
         console.log(`   Product: ${waitlist.cartItem.product?.name || 'N/A'}`);
         console.log(`   Cart Item Quantity: ${waitlist.cartItem.quantity}`);
@@ -1294,10 +1417,6 @@ const getWaitlistsByUser = async (userId, filters = {}) => {
       };
     });
 
-    console.log(
-      '🚀 Returning transformed waitlists count:',
-      transformedWaitlists.length,
-    );
     return transformedWaitlists;
   } catch (error) {
     console.error('❌ Error in getWaitlistsByUser:', error);
@@ -1311,10 +1430,7 @@ const convertCustomerWaitlistToCart = async (customerId, userId) => {
   const waitlists = await prisma.waitlist.findMany({
     where: {
       customerId,
-      OR: [
-        { userId },
-        { createdById: userId }
-      ]
+      OR: [{ userId }, { createdById: userId }],
     },
     include: {
       user: true,
@@ -1342,7 +1458,7 @@ const convertCustomerWaitlistToCart = async (customerId, userId) => {
   if (!waitlists || waitlists.length === 0) {
     throw new ApiError(
       httpStatus.NOT_FOUND,
-      'No waitlist items found for this customer'
+      'No waitlist items found for this customer',
     );
   }
 
@@ -1393,9 +1509,12 @@ const convertCustomerWaitlistToCart = async (customerId, userId) => {
       let convertedItem = null;
 
       // If this waitlist is linked to a specific cart item
-      if (waitlist.cartItemId && !processedCartItemIds.has(waitlist.cartItemId)) {
+      if (
+        waitlist.cartItemId &&
+        !processedCartItemIds.has(waitlist.cartItemId)
+      ) {
         processedCartItemIds.add(waitlist.cartItemId);
-        
+
         const originalCartItem = await prisma.cartItem.findUnique({
           where: { id: waitlist.cartItemId },
         });
@@ -1407,7 +1526,9 @@ const convertCustomerWaitlistToCart = async (customerId, userId) => {
             data: {
               cartId: cart.id,
               isWaitlist: false,
-              notes: `Bulk converted from customer waitlist: ${waitlist.note || 'No note'}`,
+              notes: `Bulk converted from customer waitlist: ${
+                waitlist.note || 'No note'
+              }`,
             },
             include: {
               shop: true,
@@ -1480,7 +1601,6 @@ const convertCustomerWaitlistToCart = async (customerId, userId) => {
 
       // Mark waitlist for deletion
       waitlistIdsToDelete.push(waitlist.id);
-
     } catch (error) {
       console.error(`Failed to process waitlist ${waitlist.id}:`, error);
       // Continue with other items
@@ -1597,6 +1717,7 @@ module.exports = {
   clearCart,
   deleteCart,
   updateCartTotals,
+  convertOrderToCart,
   // Waitlist functions
   addToWaitlist,
   clearWaitlist,
