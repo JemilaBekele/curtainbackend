@@ -740,14 +740,6 @@ const removeItemFromCart = async (cartItemId) => {
 };
 const assignCustomerToCart = async (cartId, customerId, discount, notes) => {
   try {
-    console.log('=== Starting assignCustomerToCart ===');
-    console.log('Input parameters:', {
-      cartId,
-      customerId,
-      discount,
-      notes
-    });
-
     // Validate customer exists
     const customer = await prisma.customer.findUnique({
       where: { id: customerId },
@@ -773,73 +765,66 @@ const assignCustomerToCart = async (cartId, customerId, discount, notes) => {
       );
     }
 
-    // Check if update is needed - IMPORTANT: check if cart has discount field
-    console.log('Current cart discount value:', cart.discount);
-    console.log('Current cart notes value:', cart.notes);
-    
-    const discountSame = discount === undefined || 
-                        discount === null || 
-                        cart.discount === parseFloat(discount);
-    const notesSame = notes === undefined || 
-                     notes === null || 
-                     cart.notes === notes;
-    
+    // Check if update is needed
+    const discountSame =
+      discount === undefined ||
+      discount === null ||
+      cart.discount === parseFloat(discount);
+    const notesSame =
+      notes === undefined || notes === null || cart.notes === notes;
+
     if (cart.customerId === customerId && discountSame && notesSame) {
-      console.log('No changes needed, returning existing cart');
       return cart;
     }
 
     // Build the update data
     const updateData = {
       customer: {
-        connect: { id: customerId }
-      }
+        connect: { id: customerId },
+      },
     };
 
-    // ONLY include notes for now since discount field seems missing
+    // Add discount if provided
+    if (discount !== undefined && discount !== null) {
+      const discountValue = parseFloat(discount);
+      if (isNaN(discountValue)) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          'Discount must be a valid number',
+        );
+      }
+      if (discountValue < 0) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          'Discount cannot be negative',
+        );
+      }
+      updateData.discount = discountValue;
+    }
+
+    // Add notes if provided
     if (notes !== undefined && notes !== null) {
       updateData.notes = notes;
     }
 
-    console.log('Update data prepared (excluding discount):', updateData);
-
-    // Try the update without discount first
+    // Update cart
     const updatedCart = await prisma.addToCart.update({
       where: { id: cartId },
       data: updateData,
     });
 
-    console.log('Cart updated successfully (customer and notes updated)');
-    
-    // If discount was provided, we need to handle it differently
-    if (discount !== undefined && discount !== null) {
-      const discountValue = parseFloat(discount);
-      
-      if (!isNaN(discountValue) && discountValue >= 0) {
-        console.log(`Note: Discount value ${discountValue} was provided but not applied because 'discount' field is not available in the update schema`);
-        console.log('You need to fix your Prisma schema to include the discount field');
-      }
-    }
-
     return updatedCart;
-    
   } catch (error) {
-    console.error('=== ERROR in assignCustomerToCart ===');
-    console.error('Error name:', error.name);
-    console.error('Error message:', error.message);
-    console.error('Error stack:', error.stack);
-    
     if (error instanceof ApiError) {
       throw error;
     }
-    
+
     throw new ApiError(
       httpStatus.INTERNAL_SERVER_ERROR,
-      error.message || 'Internal server error while assigning customer to cart'
+      'Internal server error while assigning customer to cart',
     );
   }
 };
-
 // Clear cart (remove all items)
 const clearCart = async (cartId, userId) => {
   const cart = await getCartById(cartId);
@@ -927,13 +912,56 @@ const checkoutCart = async (cartId, checkoutData, userId) => {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Associated customer not found');
   }
 
-  // Prepare sell body
+  // NEW: Check if cart has discount and validate it
+  if (cart.discount !== undefined && cart.discount !== null) {
+    // Validate discount is a valid number
+    const discountValue = parseFloat(cart.discount);
+    if (isNaN(discountValue)) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'Cart discount must be a valid number',
+      );
+    }
 
+    // Check if discount is negative
+    if (discountValue < 0) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'Cart discount cannot be negative',
+      );
+    }
+
+    // NEW: Check if discount is too high (optional business rule)
+    // Calculate cart total
+    const cartTotal = cart.items.reduce((total, item) => {
+      return total + item.quantity * item.unitPrice;
+    }, 0);
+
+    if (discountValue > cartTotal) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        `Discount (${discountValue}) cannot exceed cart total (${cartTotal})`,
+      );
+    }
+
+    // NEW: If discount exists, sell cannot be automatically approved
+    // This is a business rule - you might want to adjust this
+    if (discountValue > 0 && checkoutData.saleStatus === 'APPROVED') {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'Sales with discount cannot be automatically approved. Requires manager approval.',
+      );
+    }
+  }
+
+  // Prepare sell body with discount from cart
   const sellBody = {
     ...checkoutData,
     branchId: user.branchId,
     customerId: cart.customerId,
     customer: cart.customer,
+    notes: checkoutData.notes || cart.notes || '',
+    discount: cart.discount || 0,
     items: cart.items.map((item, index) => {
       const itemData = {
         productId: item.productId,
@@ -949,6 +977,11 @@ const checkoutCart = async (cartId, checkoutData, userId) => {
       };
     }),
   };
+
+  // NEW: If cart has discount, ensure sell status is NOT_APPROVED
+  if (cart.discount && cart.discount > 0) {
+    sellBody.saleStatus = 'NOT_APPROVED';
+  }
 
   const sell = await sellService.createSell(sellBody, userId);
 
@@ -967,7 +1000,10 @@ const checkoutCart = async (cartId, checkoutData, userId) => {
   return {
     cart: updatedCart,
     sell,
-    message: 'Cart checked out successfully and converted to sale',
+    message:
+      cart.discount && cart.discount > 0
+        ? 'Cart checked out successfully. Sale requires approval due to discount.'
+        : 'Cart checked out successfully and converted to sale',
   };
 };
 const convertOrderToCart = async (sellId, userId) => {
@@ -1290,7 +1326,6 @@ const addToWaitlist = async (data, userId) => {
   if (!customer) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Customer not found');
   }
-
 
   // IMPORTANT: Update the cart to mark as waitlist
   await prisma.addToCart.update({
