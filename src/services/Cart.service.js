@@ -1003,6 +1003,7 @@ const convertOrderToCart = async (sellId, userId) => {
       where: {
         customerId: sell.customerId,
         isCheckedOut: false,
+        isWaitlist: false,
       },
     });
 
