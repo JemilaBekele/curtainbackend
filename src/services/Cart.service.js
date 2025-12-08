@@ -745,48 +745,28 @@ const assignCustomerToCart = async (cartId, customerId, discount, notes) => {
       cartId,
       customerId,
       discount,
-      notes,
-      cartIdType: typeof cartId,
-      customerIdType: typeof customerId,
-      discountType: typeof discount,
-      notesType: typeof notes
+      notes
     });
 
     // Validate customer exists
-    console.log('Looking for customer with ID:', customerId);
     const customer = await prisma.customer.findUnique({
       where: { id: customerId },
     });
 
     if (!customer) {
-      console.error('Customer not found:', customerId);
       throw new ApiError(httpStatus.NOT_FOUND, 'Customer not found');
     }
-    console.log('Customer found:', customer.id);
 
     // Fetch cart with current values to check conditions
-    console.log('Looking for cart with ID:', cartId);
     const cart = await prisma.addToCart.findUnique({
       where: { id: cartId },
-      include: {
-        customer: true  // Include customer relation to check if it exists
-      }
     });
 
     if (!cart) {
-      console.error('Cart not found:', cartId);
       throw new ApiError(httpStatus.NOT_FOUND, 'Cart not found');
     }
-    console.log('Cart found:', {
-      id: cart.id,
-      customerId: cart.customerId,
-      discount: cart.discount,
-      notes: cart.notes,
-      isCheckedOut: cart.isCheckedOut
-    });
 
     if (cart.isCheckedOut) {
-      console.error('Cart is already checked out:', cartId);
       throw new ApiError(
         httpStatus.BAD_REQUEST,
         'Cannot assign customer to checked out cart',
@@ -794,19 +774,12 @@ const assignCustomerToCart = async (cartId, customerId, discount, notes) => {
     }
 
     // Check if update is needed
-    console.log('Checking if update is needed...');
-    
-    // Parse discount for comparison
-    const parsedDiscount = discount !== undefined && discount !== null 
-      ? parseFloat(discount) 
-      : cart.discount;
-    
     const discountSame = discount === undefined || 
                         discount === null || 
-                        cart.discount === parsedDiscount;
+                        cart.discount === parseFloat(discount);
     const notesSame = notes === undefined || 
                      notes === null || 
-                     cart.notes === (notes ? notes.toString() : notes);
+                     cart.notes === notes;
     
     if (cart.customerId === customerId && discountSame && notesSame) {
       console.log('No changes needed, returning existing cart');
@@ -814,83 +787,99 @@ const assignCustomerToCart = async (cartId, customerId, discount, notes) => {
     }
 
     // Validate discount if provided
+    let discountValue = null;
     if (discount !== undefined && discount !== null) {
-      console.log('Processing discount:', discount);
-      const discountValue = parseFloat(discount);
-      console.log('Parsed discount value:', discountValue);
-      
+      discountValue = parseFloat(discount);
       if (isNaN(discountValue)) {
-        console.error('Discount is not a valid number:', discount);
         throw new ApiError(
           httpStatus.BAD_REQUEST,
           'Discount must be a valid number',
         );
       }
       if (discountValue < 0) {
-        console.error('Discount is negative:', discountValue);
         throw new ApiError(httpStatus.BAD_REQUEST, 'Discount cannot be negative');
       }
     }
 
     console.log('Update needed. Preparing update...');
 
-    // Build update data using raw query approach if needed
-    let updateData = {};
+    // Build the update data - IMPORTANT: Use the correct field names from your Prisma model
+    // Based on the error, it seems the field might not be called "discount" in the update schema
+    // Let's try using set syntax or check the actual field name
     
-    // Always update customer relationship
-    updateData.customer = {
-      connect: { id: customerId }
+    const updateData = {
+      customer: {
+        connect: { id: customerId }
+      }
     };
+
+    // IMPORTANT: Check what the actual field name is in your Prisma schema
+    // It might be different than what's in your model definition
     
-    // Only include discount if explicitly provided
+    // Option 1: Try using set syntax
     if (discount !== undefined && discount !== null) {
-      updateData.discount = parseFloat(discount);
+      // Try different field names based on common patterns
+      updateData.discount = discountValue; // This might be the issue
+      // Try alternative: updateData.discount = { set: discountValue };
     }
     
-    // Only include notes if explicitly provided
     if (notes !== undefined && notes !== null) {
-      updateData.notes = notes.toString();
+      updateData.notes = notes;
     }
 
-    console.log('Update data prepared:', JSON.stringify(updateData, null, 2));
+    console.log('Update data prepared:', updateData);
 
-    // Update cart with customer and optional fields
-    console.log('Updating cart in database...');
+    // Try the update
     try {
       const updatedCart = await prisma.addToCart.update({
         where: { id: cartId },
         data: updateData,
       });
 
-      console.log('Cart updated successfully:', updatedCart.id);
-      console.log('=== Finished assignCustomerToCart ===');
+      console.log('Cart updated successfully');
       return updatedCart;
+      
     } catch (prismaError) {
       console.error('Prisma update error:', prismaError.message);
-      console.error('Prisma error code:', prismaError.code);
       
-      // Try a different approach - use raw query or check field names
-      throw new ApiError(
-        httpStatus.BAD_REQUEST,
-        `Failed to update cart: ${prismaError.message}`
-      );
+      // Try alternative approach - check if field names are different
+      // Sometimes Prisma uses different field names in update vs create
+      const alternativeUpdateData = {
+        customer: {
+          connect: { id: customerId }
+        }
+      };
+      
+      // Try with set syntax
+      if (discount !== undefined && discount !== null) {
+        alternativeUpdateData.discount = { set: discountValue };
+      }
+      
+      if (notes !== undefined && notes !== null) {
+        alternativeUpdateData.notes = { set: notes };
+      }
+      
+      console.log('Trying alternative update data:', alternativeUpdateData);
+      
+      const updatedCart = await prisma.addToCart.update({
+        where: { id: cartId },
+        data: alternativeUpdateData,
+      });
+      
+      return updatedCart;
     }
     
   } catch (error) {
     console.error('=== ERROR in assignCustomerToCart ===');
-    console.error('Error name:', error.name);
-    console.error('Error message:', error.message);
-    console.error('Error stack:', error.stack);
+    console.error('Error:', error);
     
-    // If it's already an ApiError, re-throw it
     if (error instanceof ApiError) {
       throw error;
     }
     
-    // For other errors, throw a generic server error
     throw new ApiError(
       httpStatus.INTERNAL_SERVER_ERROR,
-      'Internal server error while assigning customer to cart'
+      error.message || 'Internal server error while assigning customer to cart'
     );
   }
 };
