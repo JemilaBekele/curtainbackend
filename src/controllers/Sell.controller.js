@@ -65,7 +65,7 @@ const getSells = catchAsync(async (req, res) => {
 const getAllSellsuser = catchAsync(async (req, res) => {
   const userId = req.user.id; // ✅ User ID from auth middleware
   const { startDate, endDate } = req.query;
-
+console.log('req  :', req.query);
   const result = await sellService.getAllSellsuser({
     startDate,
     endDate,
