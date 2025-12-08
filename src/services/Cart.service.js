@@ -738,9 +738,8 @@ const removeItemFromCart = async (cartItemId) => {
 
   return { message: 'Item removed from cart successfully' };
 };
-const assignCustomerToCart = async (cartId, customerId) => {
+const assignCustomerToCart = async (cartId, customerId, discount, notes) => {
   // Validate customer exists
-
   const customer = await prisma.customer.findUnique({
     where: { id: customerId },
   });
@@ -749,6 +748,7 @@ const assignCustomerToCart = async (cartId, customerId) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Customer not found');
   }
 
+  // Fetch cart with current values to check conditions
   const cart = await prisma.addToCart.findUnique({
     where: { id: cartId },
   });
@@ -764,16 +764,49 @@ const assignCustomerToCart = async (cartId, customerId) => {
     );
   }
 
-  if (cart.customerId === customerId) {
-    return cart; // Return existing cart without update
+  // Prepare update data object
+  const updateData = {
+    customerId,
+  };
+
+  // Add discount if provided (not undefined and not null)
+  if (discount !== undefined && discount !== null) {
+    // Validate discount is a number and not negative
+    const discountValue = parseFloat(discount);
+    if (isNaN(discountValue)) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'Discount must be a valid number'
+      );
+    }
+    if (discountValue < 0) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'Discount cannot be negative'
+      );
+    }
+    updateData.discount = discountValue;
   }
 
-  // Update cart with customer
+  // Add notes if provided
+  if (notes !== undefined && notes !== null) {
+    updateData.notes = notes.toString();
+  }
+
+  // If nothing to update (same customer and no other changes), return existing cart
+  if (cart.customerId === customerId && 
+      (discount === undefined || discount === null || cart.discount === parseFloat(discount)) &&
+      (notes === undefined || notes === null || cart.notes === notes.toString())) {
+    console.log('No changes needed, returning existing cart');
+    return cart;
+  }
+
+  console.log('Updating cart with data:', updateData);
+
+  // Update cart with customer and optional fields
   const updatedCart = await prisma.addToCart.update({
     where: { id: cartId },
-    data: {
-      customerId,
-    },
+    data: updateData,
   });
 
   return updatedCart;
@@ -910,26 +943,18 @@ const checkoutCart = async (cartId, checkoutData, userId) => {
   };
 };
 const convertOrderToCart = async (sellId, userId) => {
-  console.log('🚀 [convertOrderToCart] START - Function called');
-  console.log('📝 [convertOrderToCart] Parameters:', { sellId, userId });
-
   try {
     // Get user with branch information
-    console.log('👤 [convertOrderToCart] Fetching user with ID:', userId);
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: { branch: true },
     });
 
-    console.log('👤 [convertOrderToCart] User found:', user ? 'Yes' : 'No');
     if (!user) {
-      console.error('❌ [convertOrderToCart] User not found');
       throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
     }
-    console.log('🏢 [convertOrderToCart] User branch ID:', user.branchId);
 
     // Fetch sell with all necessary relations
-    console.log('📦 [convertOrderToCart] Fetching sell with ID:', sellId);
     const sell = await prisma.sell.findUnique({
       where: { id: sellId },
       include: {
@@ -950,27 +975,12 @@ const convertOrderToCart = async (sellId, userId) => {
       },
     });
 
-    console.log('📦 [convertOrderToCart] Sell found:', sell ? 'Yes' : 'No');
     if (!sell) {
-      console.error('❌ [convertOrderToCart] Sell not found');
       throw new ApiError(httpStatus.NOT_FOUND, 'Order not found');
     }
 
-    console.log('📊 [convertOrderToCart] Sell details:', {
-      id: sell.id,
-      invoiceNo: sell.invoiceNo,
-      saleStatus: sell.saleStatus,
-      locked: sell.locked,
-      customerId: sell.customerId,
-      itemsCount: sell.items?.length || 0,
-      grandTotal: sell.grandTotal,
-      totalProducts: sell.totalProducts,
-    });
-
     // Validation checks
-    console.log('🔍 [convertOrderToCart] Checking if sell is locked:', sell.locked);
     if (sell.locked) {
-      console.error('❌ [convertOrderToCart] Sell is locked, cannot convert');
       throw new ApiError(
         httpStatus.BAD_REQUEST,
         'Cannot convert locked order to cart',
@@ -979,14 +989,8 @@ const convertOrderToCart = async (sellId, userId) => {
 
     // Check if sell status is allowed for conversion
     const allowedStatuses = ['PENDING', 'APPROVED', 'NOT_APPROVED'];
-    console.log('🔍 [convertOrderToCart] Checking sell status:', {
-      currentStatus: sell.saleStatus,
-      allowedStatuses,
-      isAllowed: allowedStatuses.includes(sell.saleStatus),
-    });
 
     if (!allowedStatuses.includes(sell.saleStatus)) {
-      console.error('❌ [convertOrderToCart] Sell status not allowed for conversion');
       throw new ApiError(
         httpStatus.BAD_REQUEST,
         `Order with status ${sell.saleStatus} cannot be converted to cart. Only pending or approved orders can be converted.`,
@@ -994,7 +998,6 @@ const convertOrderToCart = async (sellId, userId) => {
     }
 
     // Check for existing active cart
-    console.log('🔍 [convertOrderToCart] Checking for existing active cart for customer...');
     const existingCart = await prisma.addToCart.findFirst({
       where: {
         customerId: sell.customerId,
@@ -1003,10 +1006,7 @@ const convertOrderToCart = async (sellId, userId) => {
       },
     });
 
-    console.log('🔍 [convertOrderToCart] Existing cart found:', existingCart ? 'Yes' : 'No');
     if (existingCart) {
-      console.error('❌ [convertOrderToCart] Customer already has an active cart');
-      console.log('📝 [convertOrderToCart] Existing cart ID:', existingCart.id);
       throw new ApiError(
         httpStatus.BAD_REQUEST,
         'Customer already has an active cart. Please check out or delete the existing cart first.',
@@ -1014,23 +1014,24 @@ const convertOrderToCart = async (sellId, userId) => {
     }
 
     // Check for batch transactions
-    const hasBatches = sell.items.some((item) => item.batches && item.batches.length > 0);
-    console.log('🔍 [convertOrderToCart] Has batch transactions:', hasBatches);
+    const hasBatches = sell.items.some(
+      (item) => item.batches && item.batches.length > 0,
+    );
     if (hasBatches) {
-      console.warn('⚠️ [convertOrderToCart] This order has batch transactions that may need to be reversed');
       sell.items.forEach((item, index) => {
         if (item.batches && item.batches.length > 0) {
-          console.log(`📦 [convertOrderToCart] Item ${index + 1} has ${item.batches.length} batches`);
+          console.log(
+            `📦 [convertOrderToCart] Item ${index + 1} has ${
+              item.batches.length
+            } batches`,
+          );
         }
       });
     }
 
     // Start a transaction to ensure data consistency
-    console.log('💾 [convertOrderToCart] Starting database transaction...');
     return prisma.$transaction(async (prisma) => {
       try {
-        console.log('🛒 [convertOrderToCart] Creating new cart from sell...');
-        
         // Create cart data
         const cartData = {
           userId,
@@ -1046,10 +1047,19 @@ const convertOrderToCart = async (sellId, userId) => {
           items: {
             create: sell.items.map((item, index) => {
               // For the first item, include the conversion note
-              const itemNotes = index === 0 
-                ? `Converted from order: ${sell.invoiceNo} (Status: ${sell.saleStatus}). ${item.itemSaleStatus ? `Previous item status: ${item.itemSaleStatus}` : ''}`
-                : (item.itemSaleStatus ? `Previous item status: ${item.itemSaleStatus}` : null);
-              
+              const itemNotes =
+                index === 0
+                  ? `Converted from order: ${sell.invoiceNo} (Status: ${
+                      sell.saleStatus
+                    }). ${
+                      item.itemSaleStatus
+                        ? `Previous item status: ${item.itemSaleStatus}`
+                        : ''
+                    }`
+                  : item.itemSaleStatus
+                  ? `Previous item status: ${item.itemSaleStatus}`
+                  : null;
+
               return {
                 shopId: item.shopId,
                 productId: item.productId,
@@ -1064,17 +1074,7 @@ const convertOrderToCart = async (sellId, userId) => {
           },
         };
 
-        console.log('📋 [convertOrderToCart] Cart data to create:', {
-          userId,
-          branchId: user.branchId,
-          customerId: sell.customerId,
-          totalItems: sell.totalProducts,
-          totalAmount: sell.grandTotal,
-          itemsCount: sell.items?.length || 0,
-          hasCreatedById: !!cartData.createdById,
-          hasUpdatedById: !!cartData.updatedById,
-        });
-
+     
         const newCart = await prisma.addToCart.create({
           data: cartData,
           include: {
@@ -1094,60 +1094,47 @@ const convertOrderToCart = async (sellId, userId) => {
           },
         });
 
-        console.log('✅ [convertOrderToCart] New cart created successfully');
-        console.log('🛒 [convertOrderToCart] New cart details:', {
-          cartId: newCart.id,
-          itemsCount: newCart.items?.length || 0,
-          totalAmount: newCart.totalAmount,
-          createdById: newCart.createdById,
-          updatedById: newCart.updatedById,
-        });
+      
 
-        // Delete the sell and all related records in correct order
-        console.log('🗑️ [convertOrderToCart] Deleting original sell and related records...');
-        console.log('📦 [convertOrderToCart] Deleting sell ID:', sellId);
-        
-        // STEP 1: First delete SellItemBatch records (if they exist)
-        console.log('🗑️ [convertOrderToCart] Step 1: Checking for SellItemBatch records...');
-        
         // Get all sell item IDs
-        const sellItemIds = sell.items.map(item => item.id);
-        console.log('📋 [convertOrderToCart] Sell item IDs to check:', sellItemIds);
-        
+        const sellItemIds = sell.items.map((item) => item.id);
+       
+
         if (sellItemIds.length > 0) {
           try {
             // Check if SellItemBatch model exists in your schema
             // Delete batches for all sell items
-            console.log('🗑️ [convertOrderToCart] Deleting SellItemBatch records...');
+            
             await prisma.sellItemBatch.deleteMany({
               where: {
                 sellItemId: {
-                  in: sellItemIds
-                }
-              }
+                  in: sellItemIds,
+                },
+              },
             });
-            console.log('✅ [convertOrderToCart] SellItemBatch records deleted successfully');
+           
           } catch (batchError) {
-            console.warn('⚠️ [convertOrderToCart] Error deleting SellItemBatch records:', batchError.message);
+            console.warn(
+              '⚠️ [convertOrderToCart] Error deleting SellItemBatch records:',
+              batchError.message,
+            );
             // Model might not exist or have different name, continue
           }
         }
-        
+
         // STEP 2: Delete SellItem records
-        console.log('🗑️ [convertOrderToCart] Step 2: Deleting SellItem records...');
+      
         await prisma.sellItem.deleteMany({
           where: {
-            sellId: sellId
-          }
+            sellId,
+          },
         });
-        console.log('✅ [convertOrderToCart] SellItem records deleted successfully');
-        
+       
+
         // STEP 3: Now delete the main Sell record
-        console.log('🗑️ [convertOrderToCart] Step 3: Deleting Sell record...');
         await prisma.sell.delete({
           where: { id: sellId },
         });
-        console.log('✅ [convertOrderToCart] Sell record deleted successfully');
 
         const result = {
           cart: newCart,
@@ -1157,15 +1144,11 @@ const convertOrderToCart = async (sellId, userId) => {
             grandTotal: sell.grandTotal,
             totalProducts: sell.totalProducts,
           },
-          message: 'Order successfully converted to cart and original order deleted',
+          message:
+            'Order successfully converted to cart and original order deleted',
         };
 
-        console.log('🎉 [convertOrderToCart] Conversion completed successfully');
-        console.log('📊 [convertOrderToCart] Result:', {
-          cartId: newCart.id,
-          originalInvoice: sell.invoiceNo,
-          message: result.message,
-        });
+       
 
         return result;
       } catch (transactionError) {
@@ -1189,35 +1172,8 @@ const convertOrderToCart = async (sellId, userId) => {
     // Check for specific Prisma errors
     if (error.code) {
       console.error('🔧 [convertOrderToCart] Prisma error code:', error.code);
-      
-      // Common Prisma error codes
-      switch (error.code) {
-        case 'P2002':
-          console.error('🔧 [convertOrderToCart] Unique constraint failed');
-          break;
-        case 'P2003':
-          console.error('🔧 [convertOrderToCart] Foreign key constraint failed');
-          break;
-        case 'P2025':
-          console.error('🔧 [convertOrderToCart] Record to delete not found');
-          break;
-        case 'P2016':
-          console.error('🔧 [convertOrderToCart] Query interpretation error');
-          break;
-        case 'P2014':
-          console.error('🔧 [convertOrderToCart] Required relation missing');
-          break;
-      }
-    }
 
-    // Check if it's an ApiError
-    if (error instanceof ApiError) {
-      console.log('⚠️ [convertOrderToCart] This is an ApiError, re-throwing...');
-      throw error;
-    }
-
-    // If it's not an ApiError, wrap it in one
-    console.error('⚠️ [convertOrderToCart] Unknown error, wrapping in ApiError');
+   
     throw new ApiError(
       httpStatus.INTERNAL_SERVER_ERROR,
       error.message || 'Failed to convert order to cart',
@@ -1470,7 +1426,6 @@ const clearWaitlist = async (cartId) => {
 
 // Get waitlists by user
 const getWaitlistsByUser = async (userId, filters = {}) => {
-
   const { startDate, endDate, includeNoCustomer = false } = filters;
 
   const whereClause = {

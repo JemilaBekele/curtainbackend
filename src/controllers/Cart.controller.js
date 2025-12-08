@@ -103,11 +103,13 @@ const removeItemFromCart = catchAsync(async (req, res) => {
 });
 const assignCustomerToCart = catchAsync(async (req, res) => {
   const { cartId } = req.params;
-  const { customerId } = req.body;
+  const { customerId, discount, notes } = req.body;
 
   const updatedCart = await cartService.assignCustomerToCart(
     cartId,
     customerId,
+    discount,
+    notes,
   );
 
   res.status(httpStatus.OK).send({

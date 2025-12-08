@@ -772,7 +772,9 @@ model AddToCart {
   branch       Branch?      @relation(fields: [branchId], references: [id])
   isCheckedOut Boolean      @default(false)    // true when converted into a Sell
   isWaitlist   Boolean   @default(false)    // true = in wait list
-
+  discount       Float           @default(0)
+    notes          String?
+    
   customerId       String?       @db.Char(36)
   customer         Customer?     @relation(fields: [customerId], references: [id])
   totalItems   Int          @default(0)
