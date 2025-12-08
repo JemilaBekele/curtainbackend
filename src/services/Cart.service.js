@@ -993,11 +993,7 @@ const convertOrderToCart = async (sellId, userId) => {
       );
     }
 
-    // FIXED: Remove the existing cart check since AddToCart doesn't have a notes field
-    // We'll check differently or remove this check
-    console.log('🔍 [convertOrderToCart] Skipping existing cart check - AddToCart model has no notes field');
-    
-    // Alternative: Check by customer and isCheckedOut status only
+    // Check for existing active cart
     console.log('🔍 [convertOrderToCart] Checking for existing active cart for customer...');
     const existingCart = await prisma.addToCart.findFirst({
       where: {
@@ -1022,7 +1018,6 @@ const convertOrderToCart = async (sellId, userId) => {
     console.log('🔍 [convertOrderToCart] Has batch transactions:', hasBatches);
     if (hasBatches) {
       console.warn('⚠️ [convertOrderToCart] This order has batch transactions that may need to be reversed');
-      // Log batch details
       sell.items.forEach((item, index) => {
         if (item.batches && item.batches.length > 0) {
           console.log(`📦 [convertOrderToCart] Item ${index + 1} has ${item.batches.length} batches`);
@@ -1036,8 +1031,7 @@ const convertOrderToCart = async (sellId, userId) => {
       try {
         console.log('🛒 [convertOrderToCart] Creating new cart from sell...');
         
-        // FIXED: Remove notes from cartData since AddToCart doesn't have notes field
-        // We'll add the conversion note to the first cart item instead
+        // Create cart data - NOTE: createdById and updatedById are optional in schema
         const cartData = {
           userId,
           branchId: user.branchId,
@@ -1046,9 +1040,9 @@ const convertOrderToCart = async (sellId, userId) => {
           totalAmount: sell.grandTotal,
           isCheckedOut: false,
           isWaitlist: false,
-          // notes field removed - doesn't exist in AddToCart model
-          createdById: userId,
-          updatedById: userId,
+          // These are optional fields in the schema, only include if userId exists
+          ...(userId && { createdById: userId }),
+          ...(userId && { updatedById: userId }),
           items: {
             create: sell.items.map((item, index) => {
               // For the first item, include the conversion note
@@ -1065,8 +1059,6 @@ const convertOrderToCart = async (sellId, userId) => {
                 totalPrice: item.totalPrice,
                 notes: itemNotes,
                 isWaitlist: false,
-                createdById: userId,
-                updatedById: userId,
               };
             }),
           },
@@ -1079,6 +1071,8 @@ const convertOrderToCart = async (sellId, userId) => {
           totalItems: sell.totalProducts,
           totalAmount: sell.grandTotal,
           itemsCount: sell.items?.length || 0,
+          hasCreatedById: !!cartData.createdById,
+          hasUpdatedById: !!cartData.updatedById,
         });
 
         const newCart = await prisma.addToCart.create({
@@ -1105,6 +1099,8 @@ const convertOrderToCart = async (sellId, userId) => {
           cartId: newCart.id,
           itemsCount: newCart.items?.length || 0,
           totalAmount: newCart.totalAmount,
+          createdById: newCart.createdById,
+          updatedById: newCart.updatedById,
         });
 
         // Delete the sell and all related records
@@ -1171,6 +1167,9 @@ const convertOrderToCart = async (sellId, userId) => {
           break;
         case 'P2016':
           console.error('🔧 [convertOrderToCart] Query interpretation error');
+          break;
+        case 'P2014':
+          console.error('🔧 [convertOrderToCart] Required relation missing');
           break;
       }
     }
