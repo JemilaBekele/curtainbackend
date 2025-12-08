@@ -739,78 +739,133 @@ const removeItemFromCart = async (cartItemId) => {
   return { message: 'Item removed from cart successfully' };
 };
 const assignCustomerToCart = async (cartId, customerId, discount, notes) => {
-  // Validate customer exists
-  const customer = await prisma.customer.findUnique({
-    where: { id: customerId },
-  });
+  try {
+    console.log('=== Starting assignCustomerToCart ===');
+    console.log('Input parameters:', {
+      cartId,
+      customerId,
+      discount,
+      notes,
+      cartIdType: typeof cartId,
+      customerIdType: typeof customerId,
+      discountType: typeof discount,
+      notesType: typeof notes
+    });
 
-  if (!customer) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Customer not found');
-  }
+    // Validate customer exists
+    console.log('Looking for customer with ID:', customerId);
+    const customer = await prisma.customer.findUnique({
+      where: { id: customerId },
+    });
 
-  // Fetch cart with current values to check conditions
-  const cart = await prisma.addToCart.findUnique({
-    where: { id: cartId },
-  });
+    if (!customer) {
+      console.error('Customer not found:', customerId);
+      throw new ApiError(httpStatus.NOT_FOUND, 'Customer not found');
+    }
+    console.log('Customer found:', customer.id);
 
-  if (!cart) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Cart not found');
-  }
+    // Fetch cart with current values to check conditions
+    console.log('Looking for cart with ID:', cartId);
+    const cart = await prisma.addToCart.findUnique({
+      where: { id: cartId },
+    });
 
-  if (cart.isCheckedOut) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      'Cannot assign customer to checked out cart',
-    );
-  }
+    if (!cart) {
+      console.error('Cart not found:', cartId);
+      throw new ApiError(httpStatus.NOT_FOUND, 'Cart not found');
+    }
+    console.log('Cart found:', {
+      id: cart.id,
+      customerId: cart.customerId,
+      discount: cart.discount,
+      notes: cart.notes,
+      isCheckedOut: cart.isCheckedOut
+    });
 
-  // Prepare update data object
-  const updateData = {
-    customerId,
-  };
-
-  // Add discount if provided (not undefined and not null)
-  if (discount !== undefined && discount !== null) {
-    // Validate discount is a number and not negative
-    const discountValue = parseFloat(discount);
-    if (isNaN(discountValue)) {
+    if (cart.isCheckedOut) {
+      console.error('Cart is already checked out:', cartId);
       throw new ApiError(
         httpStatus.BAD_REQUEST,
-        'Discount must be a valid number',
+        'Cannot assign customer to checked out cart',
       );
     }
-    if (discountValue < 0) {
-      throw new ApiError(httpStatus.BAD_REQUEST, 'Discount cannot be negative');
+
+    // Prepare update data object
+    const updateData = {
+      customerId,
+    };
+
+    // Add discount if provided (not undefined and not null)
+    if (discount !== undefined && discount !== null) {
+      console.log('Processing discount:', discount);
+      // Validate discount is a number and not negative
+      const discountValue = parseFloat(discount);
+      console.log('Parsed discount value:', discountValue);
+      
+      if (isNaN(discountValue)) {
+        console.error('Discount is not a valid number:', discount);
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          'Discount must be a valid number',
+        );
+      }
+      if (discountValue < 0) {
+        console.error('Discount is negative:', discountValue);
+        throw new ApiError(httpStatus.BAD_REQUEST, 'Discount cannot be negative');
+      }
+      updateData.discount = discountValue;
     }
-    updateData.discount = discountValue;
+
+    // Add notes if provided
+    if (notes !== undefined && notes !== null) {
+      console.log('Processing notes:', notes);
+      updateData.notes = notes.toString();
+    }
+
+    // Check if update is needed
+    console.log('Checking if update is needed...');
+    const discountSame = discount === undefined || 
+                        discount === null || 
+                        cart.discount === parseFloat(discount);
+    const notesSame = notes === undefined || 
+                     notes === null || 
+                     cart.notes === notes.toString();
+    
+    if (cart.customerId === customerId && discountSame && notesSame) {
+      console.log('No changes needed, returning existing cart');
+      return cart;
+    }
+
+    console.log('Update needed. Preparing update data:', JSON.stringify(updateData, null, 2));
+
+    // Update cart with customer and optional fields
+    console.log('Updating cart in database...');
+    const updatedCart = await prisma.addToCart.update({
+      where: { id: cartId },
+      data: updateData,
+    });
+
+    console.log('Cart updated successfully:', updatedCart.id);
+    console.log('=== Finished assignCustomerToCart ===');
+    return updatedCart;
+    
+  } catch (error) {
+    console.error('=== ERROR in assignCustomerToCart ===');
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    
+    // If it's already an ApiError, re-throw it
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    
+    // For other errors, throw a generic server error
+    throw new ApiError(
+      httpStatus.INTERNAL_SERVER_ERROR,
+      'Internal server error while assigning customer to cart'
+    );
   }
-
-  // Add notes if provided
-  if (notes !== undefined && notes !== null) {
-    updateData.notes = notes.toString();
-  }
-
-  // If nothing to update (same customer and no other changes), return existing cart
-  if (
-    cart.customerId === customerId &&
-    (discount === undefined ||
-      discount === null ||
-      cart.discount === parseFloat(discount)) &&
-    (notes === undefined || notes === null || cart.notes === notes.toString())
-  ) {
-    console.log('No changes needed, returning existing cart');
-    return cart;
-  }
-
-  console.log('Updating cart with data:', updateData);
-
-  // Update cart with customer and optional fields
-  const updatedCart = await prisma.addToCart.update({
-    where: { id: cartId },
-    data: updateData,
-  });
-
-  return updatedCart;
 };
 
 // Clear cart (remove all items)
