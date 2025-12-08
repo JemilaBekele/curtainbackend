@@ -1834,16 +1834,32 @@ const getAllSellsuser = async ({ startDate, endDate, userId }) => {
   }
 
   const whereClause = {
-    createdById: userId, // userId is now mandatory
+    createdById: userId,
   };
 
-  const twelveMonthsAgo = subMonths(new Date(), 12); // Default time range
+  const twelveMonthsAgo = subMonths(new Date(), 12);
 
-  // Convert string dates to Date objects if they exist
-  const startDateObj = startDate ? new Date(startDate) : undefined;
-  const endDateObj = endDate ? new Date(endDate) : undefined;
+  // FIXED: Better date parsing
+  const parseDateString = (dateStr) => {
+    if (!dateStr) return undefined;
+    
+    // Ensure the date string is in ISO format
+    const date = new Date(dateStr);
+    
+    // If date is invalid, try parsing as YYYY-MM-DD
+    if (isNaN(date.getTime())) {
+      const [year, month, day] = dateStr.split('-');
+      if (year && month && day) {
+        return new Date(Date.UTC(year, month - 1, day));
+      }
+    }
+    
+    return date;
+  };
 
-  // DEBUG: Log the dates
+  const startDateObj = startDate ? parseDateString(startDate) : undefined;
+  const endDateObj = endDate ? parseDateString(endDate) : undefined;
+
   console.log('Date filter debug:', {
     startDate,
     endDate,
@@ -1852,25 +1868,31 @@ const getAllSellsuser = async ({ startDate, endDate, userId }) => {
     userId
   });
 
-  // Build the date filter - using createdAt instead of saleDate
+  // Build the date filter
   if (startDateObj && endDateObj) {
-    // Make sure endDate includes the entire day
+    // Make sure we cover the entire start day
+    const startOfDay = new Date(startDateObj);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+    
+    // Make sure we cover the entire end day
     const endOfDay = new Date(endDateObj);
-    endOfDay.setHours(23, 59, 59, 999);
+    endOfDay.setUTCHours(23, 59, 59, 999);
     
     whereClause.createdAt = {
-      gte: startDateObj,
+      gte: startOfDay,
       lte: endOfDay,
     };
   } else if (startDateObj) {
+    const startOfDay = new Date(startDateObj);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+    
     whereClause.createdAt = {
-      gte: startDateObj,
+      gte: startOfDay,
       lte: new Date(),
     };
   } else if (endDateObj) {
-    // Make sure endDate includes the entire day
     const endOfDay = new Date(endDateObj);
-    endOfDay.setHours(23, 59, 59, 999);
+    endOfDay.setUTCHours(23, 59, 59, 999);
     
     whereClause.createdAt = {
       gte: twelveMonthsAgo,
@@ -1882,10 +1904,28 @@ const getAllSellsuser = async ({ startDate, endDate, userId }) => {
     };
   }
 
-  // DEBUG: Log the where clause
-  console.log('Where clause:', JSON.stringify(whereClause, null, 2));
+  console.log('Where clause dates:', {
+    gte: whereClause.createdAt?.gte?.toISOString(),
+    lte: whereClause.createdAt?.lte?.toISOString()
+  });
 
   try {
+    // First, check if there are any sells at all for this user
+    const totalSellsCount = await prisma.sell.count({
+      where: { createdById: userId }
+    });
+    console.log(`Total sells for user ${userId}: ${totalSellsCount}`);
+
+    // Check sells without date filter
+    const allSellsSample = await prisma.sell.findMany({
+      where: { createdById: userId },
+      take: 5,
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, createdAt: true, saleDate: true, invoiceNo: true }
+    });
+    console.log('Sample sells (no date filter):', allSellsSample);
+
+    // Now query with the date filter
     const sells = await prisma.sell.findMany({
       where: whereClause,
       orderBy: {
@@ -1928,14 +1968,36 @@ const getAllSellsuser = async ({ startDate, endDate, userId }) => {
       },
     });
 
-    // DEBUG: Log results
-    console.log('Found sells:', sells.length);
-    if (sells.length > 0) {
-      console.log('Sample sell dates:', {
-        id: sells[0].id,
-        createdAt: sells[0].createdAt,
-        saleDate: sells[0].saleDate,
-        invoiceNo: sells[0].invoiceNo
+    console.log('Found sells with filter:', sells.length);
+    
+    if (sells.length === 0 && totalSellsCount > 0) {
+      // Debug: Check what dates the sells actually have
+      const recentSells = await prisma.sell.findMany({
+        where: { createdById: userId },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+        select: { 
+          id: true, 
+          createdAt: true,
+          saleDate: true,
+          invoiceNo: true 
+        }
+      });
+      
+      console.log('Recent sells dates:');
+      recentSells.forEach(sell => {
+        const sellDate = new Date(sell.createdAt);
+        const filterStart = whereClause.createdAt?.gte;
+        const filterEnd = whereClause.createdAt?.lte;
+        
+        console.log({
+          invoiceNo: sell.invoiceNo,
+          createdAt: sell.createdAt.toISOString(),
+          saleDate: sell.saleDate?.toISOString(),
+          isInRange: filterStart && filterEnd 
+            ? (sellDate >= filterStart && sellDate <= filterEnd)
+            : 'N/A'
+        });
       });
     }
 
