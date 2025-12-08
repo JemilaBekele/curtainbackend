@@ -37299,11 +37299,13 @@ export namespace Prisma {
   }
 
   export type AddToCartAvgAggregateOutputType = {
+    discount: number | null
     totalItems: number | null
     totalAmount: number | null
   }
 
   export type AddToCartSumAggregateOutputType = {
+    discount: number | null
     totalItems: number | null
     totalAmount: number | null
   }
@@ -37314,6 +37316,8 @@ export namespace Prisma {
     branchId: string | null
     isCheckedOut: boolean | null
     isWaitlist: boolean | null
+    discount: number | null
+    notes: string | null
     customerId: string | null
     totalItems: number | null
     totalAmount: number | null
@@ -37329,6 +37333,8 @@ export namespace Prisma {
     branchId: string | null
     isCheckedOut: boolean | null
     isWaitlist: boolean | null
+    discount: number | null
+    notes: string | null
     customerId: string | null
     totalItems: number | null
     totalAmount: number | null
@@ -37344,6 +37350,8 @@ export namespace Prisma {
     branchId: number
     isCheckedOut: number
     isWaitlist: number
+    discount: number
+    notes: number
     customerId: number
     totalItems: number
     totalAmount: number
@@ -37356,11 +37364,13 @@ export namespace Prisma {
 
 
   export type AddToCartAvgAggregateInputType = {
+    discount?: true
     totalItems?: true
     totalAmount?: true
   }
 
   export type AddToCartSumAggregateInputType = {
+    discount?: true
     totalItems?: true
     totalAmount?: true
   }
@@ -37371,6 +37381,8 @@ export namespace Prisma {
     branchId?: true
     isCheckedOut?: true
     isWaitlist?: true
+    discount?: true
+    notes?: true
     customerId?: true
     totalItems?: true
     totalAmount?: true
@@ -37386,6 +37398,8 @@ export namespace Prisma {
     branchId?: true
     isCheckedOut?: true
     isWaitlist?: true
+    discount?: true
+    notes?: true
     customerId?: true
     totalItems?: true
     totalAmount?: true
@@ -37401,6 +37415,8 @@ export namespace Prisma {
     branchId?: true
     isCheckedOut?: true
     isWaitlist?: true
+    discount?: true
+    notes?: true
     customerId?: true
     totalItems?: true
     totalAmount?: true
@@ -37503,6 +37519,8 @@ export namespace Prisma {
     branchId: string | null
     isCheckedOut: boolean
     isWaitlist: boolean
+    discount: number
+    notes: string | null
     customerId: string | null
     totalItems: number
     totalAmount: number
@@ -37537,6 +37555,8 @@ export namespace Prisma {
     branchId?: boolean
     isCheckedOut?: boolean
     isWaitlist?: boolean
+    discount?: boolean
+    notes?: boolean
     customerId?: boolean
     totalItems?: boolean
     totalAmount?: boolean
@@ -37562,6 +37582,8 @@ export namespace Prisma {
     branchId?: boolean
     isCheckedOut?: boolean
     isWaitlist?: boolean
+    discount?: boolean
+    notes?: boolean
     customerId?: boolean
     totalItems?: boolean
     totalAmount?: boolean
@@ -37571,7 +37593,7 @@ export namespace Prisma {
     updatedAt?: boolean
   }
 
-  export type AddToCartOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "branchId" | "isCheckedOut" | "isWaitlist" | "customerId" | "totalItems" | "totalAmount" | "createdById" | "updatedById" | "createdAt" | "updatedAt", ExtArgs["result"]["addToCart"]>
+  export type AddToCartOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "branchId" | "isCheckedOut" | "isWaitlist" | "discount" | "notes" | "customerId" | "totalItems" | "totalAmount" | "createdById" | "updatedById" | "createdAt" | "updatedAt", ExtArgs["result"]["addToCart"]>
   export type AddToCartInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     user?: boolean | UserDefaultArgs<ExtArgs>
     branch?: boolean | AddToCart$branchArgs<ExtArgs>
@@ -37600,6 +37622,8 @@ export namespace Prisma {
       branchId: string | null
       isCheckedOut: boolean
       isWaitlist: boolean
+      discount: number
+      notes: string | null
       customerId: string | null
       totalItems: number
       totalAmount: number
@@ -37988,6 +38012,8 @@ export namespace Prisma {
     readonly branchId: FieldRef<"AddToCart", 'String'>
     readonly isCheckedOut: FieldRef<"AddToCart", 'Boolean'>
     readonly isWaitlist: FieldRef<"AddToCart", 'Boolean'>
+    readonly discount: FieldRef<"AddToCart", 'Float'>
+    readonly notes: FieldRef<"AddToCart", 'String'>
     readonly customerId: FieldRef<"AddToCart", 'String'>
     readonly totalItems: FieldRef<"AddToCart", 'Int'>
     readonly totalAmount: FieldRef<"AddToCart", 'Float'>
@@ -45501,6 +45527,8 @@ export namespace Prisma {
     branchId: 'branchId',
     isCheckedOut: 'isCheckedOut',
     isWaitlist: 'isWaitlist',
+    discount: 'discount',
+    notes: 'notes',
     customerId: 'customerId',
     totalItems: 'totalItems',
     totalAmount: 'totalAmount',
@@ -45961,6 +45989,7 @@ export namespace Prisma {
     id: 'id',
     userId: 'userId',
     branchId: 'branchId',
+    notes: 'notes',
     customerId: 'customerId',
     createdById: 'createdById',
     updatedById: 'updatedById'
@@ -48803,6 +48832,8 @@ export namespace Prisma {
     branchId?: StringNullableFilter<"AddToCart"> | string | null
     isCheckedOut?: BoolFilter<"AddToCart"> | boolean
     isWaitlist?: BoolFilter<"AddToCart"> | boolean
+    discount?: FloatFilter<"AddToCart"> | number
+    notes?: StringNullableFilter<"AddToCart"> | string | null
     customerId?: StringNullableFilter<"AddToCart"> | string | null
     totalItems?: IntFilter<"AddToCart"> | number
     totalAmount?: FloatFilter<"AddToCart"> | number
@@ -48825,6 +48856,8 @@ export namespace Prisma {
     branchId?: SortOrderInput | SortOrder
     isCheckedOut?: SortOrder
     isWaitlist?: SortOrder
+    discount?: SortOrder
+    notes?: SortOrderInput | SortOrder
     customerId?: SortOrderInput | SortOrder
     totalItems?: SortOrder
     totalAmount?: SortOrder
@@ -48851,6 +48884,8 @@ export namespace Prisma {
     branchId?: StringNullableFilter<"AddToCart"> | string | null
     isCheckedOut?: BoolFilter<"AddToCart"> | boolean
     isWaitlist?: BoolFilter<"AddToCart"> | boolean
+    discount?: FloatFilter<"AddToCart"> | number
+    notes?: StringNullableFilter<"AddToCart"> | string | null
     customerId?: StringNullableFilter<"AddToCart"> | string | null
     totalItems?: IntFilter<"AddToCart"> | number
     totalAmount?: FloatFilter<"AddToCart"> | number
@@ -48873,6 +48908,8 @@ export namespace Prisma {
     branchId?: SortOrderInput | SortOrder
     isCheckedOut?: SortOrder
     isWaitlist?: SortOrder
+    discount?: SortOrder
+    notes?: SortOrderInput | SortOrder
     customerId?: SortOrderInput | SortOrder
     totalItems?: SortOrder
     totalAmount?: SortOrder
@@ -48896,6 +48933,8 @@ export namespace Prisma {
     branchId?: StringNullableWithAggregatesFilter<"AddToCart"> | string | null
     isCheckedOut?: BoolWithAggregatesFilter<"AddToCart"> | boolean
     isWaitlist?: BoolWithAggregatesFilter<"AddToCart"> | boolean
+    discount?: FloatWithAggregatesFilter<"AddToCart"> | number
+    notes?: StringNullableWithAggregatesFilter<"AddToCart"> | string | null
     customerId?: StringNullableWithAggregatesFilter<"AddToCart"> | string | null
     totalItems?: IntWithAggregatesFilter<"AddToCart"> | number
     totalAmount?: FloatWithAggregatesFilter<"AddToCart"> | number
@@ -52207,6 +52246,8 @@ export namespace Prisma {
     id?: string
     isCheckedOut?: boolean
     isWaitlist?: boolean
+    discount?: number
+    notes?: string | null
     totalItems?: number
     totalAmount?: number
     createdAt?: Date | string
@@ -52226,6 +52267,8 @@ export namespace Prisma {
     branchId?: string | null
     isCheckedOut?: boolean
     isWaitlist?: boolean
+    discount?: number
+    notes?: string | null
     customerId?: string | null
     totalItems?: number
     totalAmount?: number
@@ -52241,6 +52284,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     isCheckedOut?: BoolFieldUpdateOperationsInput | boolean
     isWaitlist?: BoolFieldUpdateOperationsInput | boolean
+    discount?: FloatFieldUpdateOperationsInput | number
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
     totalItems?: IntFieldUpdateOperationsInput | number
     totalAmount?: FloatFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -52260,6 +52305,8 @@ export namespace Prisma {
     branchId?: NullableStringFieldUpdateOperationsInput | string | null
     isCheckedOut?: BoolFieldUpdateOperationsInput | boolean
     isWaitlist?: BoolFieldUpdateOperationsInput | boolean
+    discount?: FloatFieldUpdateOperationsInput | number
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
     customerId?: NullableStringFieldUpdateOperationsInput | string | null
     totalItems?: IntFieldUpdateOperationsInput | number
     totalAmount?: FloatFieldUpdateOperationsInput | number
@@ -52277,6 +52324,8 @@ export namespace Prisma {
     branchId?: string | null
     isCheckedOut?: boolean
     isWaitlist?: boolean
+    discount?: number
+    notes?: string | null
     customerId?: string | null
     totalItems?: number
     totalAmount?: number
@@ -52290,6 +52339,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     isCheckedOut?: BoolFieldUpdateOperationsInput | boolean
     isWaitlist?: BoolFieldUpdateOperationsInput | boolean
+    discount?: FloatFieldUpdateOperationsInput | number
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
     totalItems?: IntFieldUpdateOperationsInput | number
     totalAmount?: FloatFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -52302,6 +52353,8 @@ export namespace Prisma {
     branchId?: NullableStringFieldUpdateOperationsInput | string | null
     isCheckedOut?: BoolFieldUpdateOperationsInput | boolean
     isWaitlist?: BoolFieldUpdateOperationsInput | boolean
+    discount?: FloatFieldUpdateOperationsInput | number
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
     customerId?: NullableStringFieldUpdateOperationsInput | string | null
     totalItems?: IntFieldUpdateOperationsInput | number
     totalAmount?: FloatFieldUpdateOperationsInput | number
@@ -55078,6 +55131,8 @@ export namespace Prisma {
     branchId?: SortOrder
     isCheckedOut?: SortOrder
     isWaitlist?: SortOrder
+    discount?: SortOrder
+    notes?: SortOrder
     customerId?: SortOrder
     totalItems?: SortOrder
     totalAmount?: SortOrder
@@ -55088,6 +55143,7 @@ export namespace Prisma {
   }
 
   export type AddToCartAvgOrderByAggregateInput = {
+    discount?: SortOrder
     totalItems?: SortOrder
     totalAmount?: SortOrder
   }
@@ -55098,6 +55154,8 @@ export namespace Prisma {
     branchId?: SortOrder
     isCheckedOut?: SortOrder
     isWaitlist?: SortOrder
+    discount?: SortOrder
+    notes?: SortOrder
     customerId?: SortOrder
     totalItems?: SortOrder
     totalAmount?: SortOrder
@@ -55113,6 +55171,8 @@ export namespace Prisma {
     branchId?: SortOrder
     isCheckedOut?: SortOrder
     isWaitlist?: SortOrder
+    discount?: SortOrder
+    notes?: SortOrder
     customerId?: SortOrder
     totalItems?: SortOrder
     totalAmount?: SortOrder
@@ -55123,6 +55183,7 @@ export namespace Prisma {
   }
 
   export type AddToCartSumOrderByAggregateInput = {
+    discount?: SortOrder
     totalItems?: SortOrder
     totalAmount?: SortOrder
   }
@@ -62267,6 +62328,8 @@ export namespace Prisma {
     id?: string
     isCheckedOut?: boolean
     isWaitlist?: boolean
+    discount?: number
+    notes?: string | null
     totalItems?: number
     totalAmount?: number
     createdAt?: Date | string
@@ -62284,6 +62347,8 @@ export namespace Prisma {
     branchId?: string | null
     isCheckedOut?: boolean
     isWaitlist?: boolean
+    discount?: number
+    notes?: string | null
     customerId?: string | null
     totalItems?: number
     totalAmount?: number
@@ -62309,6 +62374,8 @@ export namespace Prisma {
     id?: string
     isCheckedOut?: boolean
     isWaitlist?: boolean
+    discount?: number
+    notes?: string | null
     totalItems?: number
     totalAmount?: number
     createdAt?: Date | string
@@ -62327,6 +62394,8 @@ export namespace Prisma {
     branchId?: string | null
     isCheckedOut?: boolean
     isWaitlist?: boolean
+    discount?: number
+    notes?: string | null
     customerId?: string | null
     totalItems?: number
     totalAmount?: number
@@ -62351,6 +62420,8 @@ export namespace Prisma {
     id?: string
     isCheckedOut?: boolean
     isWaitlist?: boolean
+    discount?: number
+    notes?: string | null
     totalItems?: number
     totalAmount?: number
     createdAt?: Date | string
@@ -62369,6 +62440,8 @@ export namespace Prisma {
     branchId?: string | null
     isCheckedOut?: boolean
     isWaitlist?: boolean
+    discount?: number
+    notes?: string | null
     customerId?: string | null
     totalItems?: number
     totalAmount?: number
@@ -62990,6 +63063,8 @@ export namespace Prisma {
     branchId?: StringNullableFilter<"AddToCart"> | string | null
     isCheckedOut?: BoolFilter<"AddToCart"> | boolean
     isWaitlist?: BoolFilter<"AddToCart"> | boolean
+    discount?: FloatFilter<"AddToCart"> | number
+    notes?: StringNullableFilter<"AddToCart"> | string | null
     customerId?: StringNullableFilter<"AddToCart"> | string | null
     totalItems?: IntFilter<"AddToCart"> | number
     totalAmount?: FloatFilter<"AddToCart"> | number
@@ -63635,6 +63710,8 @@ export namespace Prisma {
     id?: string
     isCheckedOut?: boolean
     isWaitlist?: boolean
+    discount?: number
+    notes?: string | null
     totalItems?: number
     totalAmount?: number
     createdAt?: Date | string
@@ -63652,6 +63729,8 @@ export namespace Prisma {
     userId: string
     isCheckedOut?: boolean
     isWaitlist?: boolean
+    discount?: number
+    notes?: string | null
     customerId?: string | null
     totalItems?: number
     totalAmount?: number
@@ -66602,6 +66681,8 @@ export namespace Prisma {
     id?: string
     isCheckedOut?: boolean
     isWaitlist?: boolean
+    discount?: number
+    notes?: string | null
     totalItems?: number
     totalAmount?: number
     createdAt?: Date | string
@@ -66620,6 +66701,8 @@ export namespace Prisma {
     branchId?: string | null
     isCheckedOut?: boolean
     isWaitlist?: boolean
+    discount?: number
+    notes?: string | null
     totalItems?: number
     totalAmount?: number
     createdById?: string | null
@@ -74148,6 +74231,8 @@ export namespace Prisma {
     id?: string
     isCheckedOut?: boolean
     isWaitlist?: boolean
+    discount?: number
+    notes?: string | null
     totalItems?: number
     totalAmount?: number
     createdAt?: Date | string
@@ -74166,6 +74251,8 @@ export namespace Prisma {
     branchId?: string | null
     isCheckedOut?: boolean
     isWaitlist?: boolean
+    discount?: number
+    notes?: string | null
     customerId?: string | null
     totalItems?: number
     totalAmount?: number
@@ -74371,6 +74458,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     isCheckedOut?: BoolFieldUpdateOperationsInput | boolean
     isWaitlist?: BoolFieldUpdateOperationsInput | boolean
+    discount?: FloatFieldUpdateOperationsInput | number
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
     totalItems?: IntFieldUpdateOperationsInput | number
     totalAmount?: FloatFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -74389,6 +74478,8 @@ export namespace Prisma {
     branchId?: NullableStringFieldUpdateOperationsInput | string | null
     isCheckedOut?: BoolFieldUpdateOperationsInput | boolean
     isWaitlist?: BoolFieldUpdateOperationsInput | boolean
+    discount?: FloatFieldUpdateOperationsInput | number
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
     customerId?: NullableStringFieldUpdateOperationsInput | string | null
     totalItems?: IntFieldUpdateOperationsInput | number
     totalAmount?: FloatFieldUpdateOperationsInput | number
@@ -74713,6 +74804,8 @@ export namespace Prisma {
     id?: string
     isCheckedOut?: boolean
     isWaitlist?: boolean
+    discount?: number
+    notes?: string | null
     totalItems?: number
     totalAmount?: number
     createdAt?: Date | string
@@ -74731,6 +74824,8 @@ export namespace Prisma {
     branchId?: string | null
     isCheckedOut?: boolean
     isWaitlist?: boolean
+    discount?: number
+    notes?: string | null
     customerId?: string | null
     totalItems?: number
     totalAmount?: number
@@ -75203,6 +75298,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     isCheckedOut?: BoolFieldUpdateOperationsInput | boolean
     isWaitlist?: BoolFieldUpdateOperationsInput | boolean
+    discount?: FloatFieldUpdateOperationsInput | number
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
     totalItems?: IntFieldUpdateOperationsInput | number
     totalAmount?: FloatFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -75221,6 +75318,8 @@ export namespace Prisma {
     branchId?: NullableStringFieldUpdateOperationsInput | string | null
     isCheckedOut?: BoolFieldUpdateOperationsInput | boolean
     isWaitlist?: BoolFieldUpdateOperationsInput | boolean
+    discount?: FloatFieldUpdateOperationsInput | number
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
     customerId?: NullableStringFieldUpdateOperationsInput | string | null
     totalItems?: IntFieldUpdateOperationsInput | number
     totalAmount?: FloatFieldUpdateOperationsInput | number
@@ -76934,6 +77033,8 @@ export namespace Prisma {
     branchId?: string | null
     isCheckedOut?: boolean
     isWaitlist?: boolean
+    discount?: number
+    notes?: string | null
     customerId?: string | null
     totalItems?: number
     totalAmount?: number
@@ -76949,6 +77050,8 @@ export namespace Prisma {
     branchId?: string | null
     isCheckedOut?: boolean
     isWaitlist?: boolean
+    discount?: number
+    notes?: string | null
     customerId?: string | null
     totalItems?: number
     totalAmount?: number
@@ -76963,6 +77066,8 @@ export namespace Prisma {
     branchId?: string | null
     isCheckedOut?: boolean
     isWaitlist?: boolean
+    discount?: number
+    notes?: string | null
     customerId?: string | null
     totalItems?: number
     totalAmount?: number
@@ -77708,6 +77813,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     isCheckedOut?: BoolFieldUpdateOperationsInput | boolean
     isWaitlist?: BoolFieldUpdateOperationsInput | boolean
+    discount?: FloatFieldUpdateOperationsInput | number
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
     totalItems?: IntFieldUpdateOperationsInput | number
     totalAmount?: FloatFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -77725,6 +77832,8 @@ export namespace Prisma {
     branchId?: NullableStringFieldUpdateOperationsInput | string | null
     isCheckedOut?: BoolFieldUpdateOperationsInput | boolean
     isWaitlist?: BoolFieldUpdateOperationsInput | boolean
+    discount?: FloatFieldUpdateOperationsInput | number
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
     customerId?: NullableStringFieldUpdateOperationsInput | string | null
     totalItems?: IntFieldUpdateOperationsInput | number
     totalAmount?: FloatFieldUpdateOperationsInput | number
@@ -77741,6 +77850,8 @@ export namespace Prisma {
     branchId?: NullableStringFieldUpdateOperationsInput | string | null
     isCheckedOut?: BoolFieldUpdateOperationsInput | boolean
     isWaitlist?: BoolFieldUpdateOperationsInput | boolean
+    discount?: FloatFieldUpdateOperationsInput | number
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
     customerId?: NullableStringFieldUpdateOperationsInput | string | null
     totalItems?: IntFieldUpdateOperationsInput | number
     totalAmount?: FloatFieldUpdateOperationsInput | number
@@ -77754,6 +77865,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     isCheckedOut?: BoolFieldUpdateOperationsInput | boolean
     isWaitlist?: BoolFieldUpdateOperationsInput | boolean
+    discount?: FloatFieldUpdateOperationsInput | number
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
     totalItems?: IntFieldUpdateOperationsInput | number
     totalAmount?: FloatFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -77772,6 +77885,8 @@ export namespace Prisma {
     branchId?: NullableStringFieldUpdateOperationsInput | string | null
     isCheckedOut?: BoolFieldUpdateOperationsInput | boolean
     isWaitlist?: BoolFieldUpdateOperationsInput | boolean
+    discount?: FloatFieldUpdateOperationsInput | number
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
     customerId?: NullableStringFieldUpdateOperationsInput | string | null
     totalItems?: IntFieldUpdateOperationsInput | number
     totalAmount?: FloatFieldUpdateOperationsInput | number
@@ -77788,6 +77903,8 @@ export namespace Prisma {
     branchId?: NullableStringFieldUpdateOperationsInput | string | null
     isCheckedOut?: BoolFieldUpdateOperationsInput | boolean
     isWaitlist?: BoolFieldUpdateOperationsInput | boolean
+    discount?: FloatFieldUpdateOperationsInput | number
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
     customerId?: NullableStringFieldUpdateOperationsInput | string | null
     totalItems?: IntFieldUpdateOperationsInput | number
     totalAmount?: FloatFieldUpdateOperationsInput | number
@@ -77800,6 +77917,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     isCheckedOut?: BoolFieldUpdateOperationsInput | boolean
     isWaitlist?: BoolFieldUpdateOperationsInput | boolean
+    discount?: FloatFieldUpdateOperationsInput | number
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
     totalItems?: IntFieldUpdateOperationsInput | number
     totalAmount?: FloatFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -77818,6 +77937,8 @@ export namespace Prisma {
     branchId?: NullableStringFieldUpdateOperationsInput | string | null
     isCheckedOut?: BoolFieldUpdateOperationsInput | boolean
     isWaitlist?: BoolFieldUpdateOperationsInput | boolean
+    discount?: FloatFieldUpdateOperationsInput | number
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
     customerId?: NullableStringFieldUpdateOperationsInput | string | null
     totalItems?: IntFieldUpdateOperationsInput | number
     totalAmount?: FloatFieldUpdateOperationsInput | number
@@ -77834,6 +77955,8 @@ export namespace Prisma {
     branchId?: NullableStringFieldUpdateOperationsInput | string | null
     isCheckedOut?: BoolFieldUpdateOperationsInput | boolean
     isWaitlist?: BoolFieldUpdateOperationsInput | boolean
+    discount?: FloatFieldUpdateOperationsInput | number
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
     customerId?: NullableStringFieldUpdateOperationsInput | string | null
     totalItems?: IntFieldUpdateOperationsInput | number
     totalAmount?: FloatFieldUpdateOperationsInput | number
@@ -78197,6 +78320,8 @@ export namespace Prisma {
     userId: string
     isCheckedOut?: boolean
     isWaitlist?: boolean
+    discount?: number
+    notes?: string | null
     customerId?: string | null
     totalItems?: number
     totalAmount?: number
@@ -78462,6 +78587,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     isCheckedOut?: BoolFieldUpdateOperationsInput | boolean
     isWaitlist?: BoolFieldUpdateOperationsInput | boolean
+    discount?: FloatFieldUpdateOperationsInput | number
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
     totalItems?: IntFieldUpdateOperationsInput | number
     totalAmount?: FloatFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -78479,6 +78606,8 @@ export namespace Prisma {
     userId?: StringFieldUpdateOperationsInput | string
     isCheckedOut?: BoolFieldUpdateOperationsInput | boolean
     isWaitlist?: BoolFieldUpdateOperationsInput | boolean
+    discount?: FloatFieldUpdateOperationsInput | number
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
     customerId?: NullableStringFieldUpdateOperationsInput | string | null
     totalItems?: IntFieldUpdateOperationsInput | number
     totalAmount?: FloatFieldUpdateOperationsInput | number
@@ -78495,6 +78624,8 @@ export namespace Prisma {
     userId?: StringFieldUpdateOperationsInput | string
     isCheckedOut?: BoolFieldUpdateOperationsInput | boolean
     isWaitlist?: BoolFieldUpdateOperationsInput | boolean
+    discount?: FloatFieldUpdateOperationsInput | number
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
     customerId?: NullableStringFieldUpdateOperationsInput | string | null
     totalItems?: IntFieldUpdateOperationsInput | number
     totalAmount?: FloatFieldUpdateOperationsInput | number
@@ -79893,6 +80024,8 @@ export namespace Prisma {
     branchId?: string | null
     isCheckedOut?: boolean
     isWaitlist?: boolean
+    discount?: number
+    notes?: string | null
     totalItems?: number
     totalAmount?: number
     createdById?: string | null
@@ -79988,6 +80121,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     isCheckedOut?: BoolFieldUpdateOperationsInput | boolean
     isWaitlist?: BoolFieldUpdateOperationsInput | boolean
+    discount?: FloatFieldUpdateOperationsInput | number
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
     totalItems?: IntFieldUpdateOperationsInput | number
     totalAmount?: FloatFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -80006,6 +80141,8 @@ export namespace Prisma {
     branchId?: NullableStringFieldUpdateOperationsInput | string | null
     isCheckedOut?: BoolFieldUpdateOperationsInput | boolean
     isWaitlist?: BoolFieldUpdateOperationsInput | boolean
+    discount?: FloatFieldUpdateOperationsInput | number
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
     totalItems?: IntFieldUpdateOperationsInput | number
     totalAmount?: FloatFieldUpdateOperationsInput | number
     createdById?: NullableStringFieldUpdateOperationsInput | string | null
@@ -80022,6 +80159,8 @@ export namespace Prisma {
     branchId?: NullableStringFieldUpdateOperationsInput | string | null
     isCheckedOut?: BoolFieldUpdateOperationsInput | boolean
     isWaitlist?: BoolFieldUpdateOperationsInput | boolean
+    discount?: FloatFieldUpdateOperationsInput | number
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
     totalItems?: IntFieldUpdateOperationsInput | number
     totalAmount?: FloatFieldUpdateOperationsInput | number
     createdById?: NullableStringFieldUpdateOperationsInput | string | null

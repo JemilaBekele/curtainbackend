@@ -773,7 +773,10 @@ const assignCustomerToCart = async (cartId, customerId, discount, notes) => {
       );
     }
 
-    // Check if update is needed
+    // Check if update is needed - IMPORTANT: check if cart has discount field
+    console.log('Current cart discount value:', cart.discount);
+    console.log('Current cart notes value:', cart.notes);
+    
     const discountSame = discount === undefined || 
                         discount === null || 
                         cart.discount === parseFloat(discount);
@@ -786,92 +789,45 @@ const assignCustomerToCart = async (cartId, customerId, discount, notes) => {
       return cart;
     }
 
-    // Validate discount if provided
-    let discountValue = null;
-    if (discount !== undefined && discount !== null) {
-      discountValue = parseFloat(discount);
-      if (isNaN(discountValue)) {
-        throw new ApiError(
-          httpStatus.BAD_REQUEST,
-          'Discount must be a valid number',
-        );
-      }
-      if (discountValue < 0) {
-        throw new ApiError(httpStatus.BAD_REQUEST, 'Discount cannot be negative');
-      }
-    }
-
-    console.log('Update needed. Preparing update...');
-
-    // Build the update data - IMPORTANT: Use the correct field names from your Prisma model
-    // Based on the error, it seems the field might not be called "discount" in the update schema
-    // Let's try using set syntax or check the actual field name
-    
+    // Build the update data
     const updateData = {
       customer: {
         connect: { id: customerId }
       }
     };
 
-    // IMPORTANT: Check what the actual field name is in your Prisma schema
-    // It might be different than what's in your model definition
-    
-    // Option 1: Try using set syntax
-    if (discount !== undefined && discount !== null) {
-      // Try different field names based on common patterns
-      updateData.discount = discountValue; // This might be the issue
-      // Try alternative: updateData.discount = { set: discountValue };
-    }
-    
+    // ONLY include notes for now since discount field seems missing
     if (notes !== undefined && notes !== null) {
       updateData.notes = notes;
     }
 
-    console.log('Update data prepared:', updateData);
+    console.log('Update data prepared (excluding discount):', updateData);
 
-    // Try the update
-    try {
-      const updatedCart = await prisma.addToCart.update({
-        where: { id: cartId },
-        data: updateData,
-      });
+    // Try the update without discount first
+    const updatedCart = await prisma.addToCart.update({
+      where: { id: cartId },
+      data: updateData,
+    });
 
-      console.log('Cart updated successfully');
-      return updatedCart;
+    console.log('Cart updated successfully (customer and notes updated)');
+    
+    // If discount was provided, we need to handle it differently
+    if (discount !== undefined && discount !== null) {
+      const discountValue = parseFloat(discount);
       
-    } catch (prismaError) {
-      console.error('Prisma update error:', prismaError.message);
-      
-      // Try alternative approach - check if field names are different
-      // Sometimes Prisma uses different field names in update vs create
-      const alternativeUpdateData = {
-        customer: {
-          connect: { id: customerId }
-        }
-      };
-      
-      // Try with set syntax
-      if (discount !== undefined && discount !== null) {
-        alternativeUpdateData.discount = { set: discountValue };
+      if (!isNaN(discountValue) && discountValue >= 0) {
+        console.log(`Note: Discount value ${discountValue} was provided but not applied because 'discount' field is not available in the update schema`);
+        console.log('You need to fix your Prisma schema to include the discount field');
       }
-      
-      if (notes !== undefined && notes !== null) {
-        alternativeUpdateData.notes = { set: notes };
-      }
-      
-      console.log('Trying alternative update data:', alternativeUpdateData);
-      
-      const updatedCart = await prisma.addToCart.update({
-        where: { id: cartId },
-        data: alternativeUpdateData,
-      });
-      
-      return updatedCart;
     }
+
+    return updatedCart;
     
   } catch (error) {
     console.error('=== ERROR in assignCustomerToCart ===');
-    console.error('Error:', error);
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
     
     if (error instanceof ApiError) {
       throw error;

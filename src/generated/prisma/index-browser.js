@@ -473,6 +473,8 @@ exports.Prisma.AddToCartScalarFieldEnum = {
   branchId: 'branchId',
   isCheckedOut: 'isCheckedOut',
   isWaitlist: 'isWaitlist',
+  discount: 'discount',
+  notes: 'notes',
   customerId: 'customerId',
   totalItems: 'totalItems',
   totalAmount: 'totalAmount',
@@ -819,6 +821,7 @@ exports.Prisma.AddToCartOrderByRelevanceFieldEnum = {
   id: 'id',
   userId: 'userId',
   branchId: 'branchId',
+  notes: 'notes',
   customerId: 'customerId',
   createdById: 'createdById',
   updatedById: 'updatedById'
