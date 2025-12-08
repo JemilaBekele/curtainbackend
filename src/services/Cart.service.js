@@ -790,9 +790,11 @@ const assignCustomerToCart = async (cartId, customerId, discount, notes) => {
       );
     }
 
-    // Prepare update data object
+    // Prepare update data object - Use connect syntax for relations
     const updateData = {
-      customerId,
+      customer: {
+        connect: { id: customerId }
+      }
     };
 
     // Add discount if provided (not undefined and not null)
@@ -822,7 +824,7 @@ const assignCustomerToCart = async (cartId, customerId, discount, notes) => {
       updateData.notes = notes.toString();
     }
 
-    // Check if update is needed
+    // Check if update is needed - compare with current cart customerId
     console.log('Checking if update is needed...');
     const discountSame = discount === undefined || 
                         discount === null || 
