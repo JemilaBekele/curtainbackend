@@ -768,6 +768,9 @@ const assignCustomerToCart = async (cartId, customerId, discount, notes) => {
     console.log('Looking for cart with ID:', cartId);
     const cart = await prisma.addToCart.findUnique({
       where: { id: cartId },
+      include: {
+        customer: true  // Include customer relation to check if it exists
+      }
     });
 
     if (!cart) {
@@ -790,17 +793,29 @@ const assignCustomerToCart = async (cartId, customerId, discount, notes) => {
       );
     }
 
-    // Prepare update data object - Use connect syntax for relations
-    const updateData = {
-      customer: {
-        connect: { id: customerId }
-      }
-    };
+    // Check if update is needed
+    console.log('Checking if update is needed...');
+    
+    // Parse discount for comparison
+    const parsedDiscount = discount !== undefined && discount !== null 
+      ? parseFloat(discount) 
+      : cart.discount;
+    
+    const discountSame = discount === undefined || 
+                        discount === null || 
+                        cart.discount === parsedDiscount;
+    const notesSame = notes === undefined || 
+                     notes === null || 
+                     cart.notes === (notes ? notes.toString() : notes);
+    
+    if (cart.customerId === customerId && discountSame && notesSame) {
+      console.log('No changes needed, returning existing cart');
+      return cart;
+    }
 
-    // Add discount if provided (not undefined and not null)
+    // Validate discount if provided
     if (discount !== undefined && discount !== null) {
       console.log('Processing discount:', discount);
-      // Validate discount is a number and not negative
       const discountValue = parseFloat(discount);
       console.log('Parsed discount value:', discountValue);
       
@@ -815,41 +830,51 @@ const assignCustomerToCart = async (cartId, customerId, discount, notes) => {
         console.error('Discount is negative:', discountValue);
         throw new ApiError(httpStatus.BAD_REQUEST, 'Discount cannot be negative');
       }
-      updateData.discount = discountValue;
     }
 
-    // Add notes if provided
+    console.log('Update needed. Preparing update...');
+
+    // Build update data using raw query approach if needed
+    let updateData = {};
+    
+    // Always update customer relationship
+    updateData.customer = {
+      connect: { id: customerId }
+    };
+    
+    // Only include discount if explicitly provided
+    if (discount !== undefined && discount !== null) {
+      updateData.discount = parseFloat(discount);
+    }
+    
+    // Only include notes if explicitly provided
     if (notes !== undefined && notes !== null) {
-      console.log('Processing notes:', notes);
       updateData.notes = notes.toString();
     }
 
-    // Check if update is needed - compare with current cart customerId
-    console.log('Checking if update is needed...');
-    const discountSame = discount === undefined || 
-                        discount === null || 
-                        cart.discount === parseFloat(discount);
-    const notesSame = notes === undefined || 
-                     notes === null || 
-                     cart.notes === notes.toString();
-    
-    if (cart.customerId === customerId && discountSame && notesSame) {
-      console.log('No changes needed, returning existing cart');
-      return cart;
-    }
-
-    console.log('Update needed. Preparing update data:', JSON.stringify(updateData, null, 2));
+    console.log('Update data prepared:', JSON.stringify(updateData, null, 2));
 
     // Update cart with customer and optional fields
     console.log('Updating cart in database...');
-    const updatedCart = await prisma.addToCart.update({
-      where: { id: cartId },
-      data: updateData,
-    });
+    try {
+      const updatedCart = await prisma.addToCart.update({
+        where: { id: cartId },
+        data: updateData,
+      });
 
-    console.log('Cart updated successfully:', updatedCart.id);
-    console.log('=== Finished assignCustomerToCart ===');
-    return updatedCart;
+      console.log('Cart updated successfully:', updatedCart.id);
+      console.log('=== Finished assignCustomerToCart ===');
+      return updatedCart;
+    } catch (prismaError) {
+      console.error('Prisma update error:', prismaError.message);
+      console.error('Prisma error code:', prismaError.code);
+      
+      // Try a different approach - use raw query or check field names
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        `Failed to update cart: ${prismaError.message}`
+      );
+    }
     
   } catch (error) {
     console.error('=== ERROR in assignCustomerToCart ===');
