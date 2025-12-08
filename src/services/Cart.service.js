@@ -993,26 +993,26 @@ const convertOrderToCart = async (sellId, userId) => {
       );
     }
 
-    // Check if this order already has an associated cart
-    console.log('🔍 [convertOrderToCart] Checking for existing cart...');
+    // FIXED: Remove the existing cart check since AddToCart doesn't have a notes field
+    // We'll check differently or remove this check
+    console.log('🔍 [convertOrderToCart] Skipping existing cart check - AddToCart model has no notes field');
+    
+    // Alternative: Check by customer and isCheckedOut status only
+    console.log('🔍 [convertOrderToCart] Checking for existing active cart for customer...');
     const existingCart = await prisma.addToCart.findFirst({
       where: {
         customerId: sell.customerId,
         isCheckedOut: false,
-        OR: [
-          { notes: { contains: `Converted from order: ${sell.invoiceNo}` } },
-          { notes: { contains: sellId } },
-        ],
       },
     });
 
     console.log('🔍 [convertOrderToCart] Existing cart found:', existingCart ? 'Yes' : 'No');
     if (existingCart) {
-      console.error('❌ [convertOrderToCart] Cart already exists for this order');
+      console.error('❌ [convertOrderToCart] Customer already has an active cart');
       console.log('📝 [convertOrderToCart] Existing cart ID:', existingCart.id);
       throw new ApiError(
         httpStatus.BAD_REQUEST,
-        'A cart already exists for this order conversion',
+        'Customer already has an active cart. Please check out or delete the existing cart first.',
       );
     }
 
@@ -1035,7 +1035,8 @@ const convertOrderToCart = async (sellId, userId) => {
       try {
         console.log('🛒 [convertOrderToCart] Creating new cart from sell...');
         
-        // Log cart creation data
+        // FIXED: Remove notes from cartData since AddToCart doesn't have notes field
+        // We'll add the conversion note to the first cart item instead
         const cartData = {
           userId,
           branchId: user.branchId,
@@ -1044,24 +1045,29 @@ const convertOrderToCart = async (sellId, userId) => {
           totalAmount: sell.grandTotal,
           isCheckedOut: false,
           isWaitlist: false,
-          notes: `Converted from order: ${sell.invoiceNo} (Original Status: ${sell.saleStatus})`,
+          // notes field removed - doesn't exist in AddToCart model
           createdById: userId,
           updatedById: userId,
           items: {
-            create: sell.items.map((item, index) => ({
-              shopId: item.shopId,
-              productId: item.productId,
-              unitOfMeasureId: item.unitOfMeasureId,
-              quantity: item.quantity,
-              unitPrice: item.unitPrice,
-              totalPrice: item.totalPrice,
-              notes: item.itemSaleStatus
-                ? `Previous item status: ${item.itemSaleStatus}`
-                : null,
-              isWaitlist: false,
-              createdById: userId,
-              updatedById: userId,
-            })),
+            create: sell.items.map((item, index) => {
+              // For the first item, include the conversion note
+              const itemNotes = index === 0 
+                ? `Converted from order: ${sell.invoiceNo} (Status: ${sell.saleStatus}). ${item.itemSaleStatus ? `Previous item status: ${item.itemSaleStatus}` : ''}`
+                : (item.itemSaleStatus ? `Previous item status: ${item.itemSaleStatus}` : null);
+              
+              return {
+                shopId: item.shopId,
+                productId: item.productId,
+                unitOfMeasureId: item.unitOfMeasureId,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice,
+                totalPrice: item.totalPrice,
+                notes: itemNotes,
+                isWaitlist: false,
+                createdById: userId,
+                updatedById: userId,
+              };
+            }),
           },
         };
 
@@ -1072,7 +1078,6 @@ const convertOrderToCart = async (sellId, userId) => {
           totalItems: sell.totalProducts,
           totalAmount: sell.grandTotal,
           itemsCount: sell.items?.length || 0,
-          notes: cartData.notes,
         });
 
         const newCart = await prisma.addToCart.create({
