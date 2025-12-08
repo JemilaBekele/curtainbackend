@@ -1843,73 +1843,110 @@ const getAllSellsuser = async ({ startDate, endDate, userId }) => {
   const startDateObj = startDate ? new Date(startDate) : undefined;
   const endDateObj = endDate ? new Date(endDate) : undefined;
 
-  // Build the date filter
+  // DEBUG: Log the dates
+  console.log('Date filter debug:', {
+    startDate,
+    endDate,
+    startDateObj: startDateObj?.toISOString(),
+    endDateObj: endDateObj?.toISOString(),
+    userId
+  });
+
+  // Build the date filter - using createdAt instead of saleDate
   if (startDateObj && endDateObj) {
-    whereClause.saleDate = {
+    // Make sure endDate includes the entire day
+    const endOfDay = new Date(endDateObj);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    whereClause.createdAt = {
       gte: startDateObj,
-      lte: endDateObj,
+      lte: endOfDay,
     };
   } else if (startDateObj) {
-    whereClause.saleDate = {
+    whereClause.createdAt = {
       gte: startDateObj,
       lte: new Date(),
     };
   } else if (endDateObj) {
-    whereClause.saleDate = {
+    // Make sure endDate includes the entire day
+    const endOfDay = new Date(endDateObj);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    whereClause.createdAt = {
       gte: twelveMonthsAgo,
-      lte: endDateObj,
+      lte: endOfDay,
     };
   } else {
-    whereClause.saleDate = {
+    whereClause.createdAt = {
       gte: twelveMonthsAgo,
     };
   }
 
-  const sells = await prisma.sell.findMany({
-    where: whereClause,
-    orderBy: {
-      createdAt: 'desc',
-    },
-    include: {
-      branch: true,
-      customer: true,
-      createdBy: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
+  // DEBUG: Log the where clause
+  console.log('Where clause:', JSON.stringify(whereClause, null, 2));
+
+  try {
+    const sells = await prisma.sell.findMany({
+      where: whereClause,
+      orderBy: {
+        createdAt: 'desc',
       },
-      items: {
-        include: {
-          product: {
-            include: {
-              unitOfMeasure: true,
-              category: true,
-            },
+      include: {
+        branch: true,
+        customer: true,
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
           },
-          shop: true,
-          unitOfMeasure: true,
-          batches: {
-            include: {
-              batch: {
-                include: {
-                  product: true,
+        },
+        items: {
+          include: {
+            product: {
+              include: {
+                unitOfMeasure: true,
+                category: true,
+              },
+            },
+            shop: true,
+            unitOfMeasure: true,
+            batches: {
+              include: {
+                batch: {
+                  include: {
+                    product: true,
+                  },
                 },
               },
             },
           },
         },
+        _count: {
+          select: { items: true },
+        },
       },
-      _count: {
-        select: { items: true },
-      },
-    },
-  });
-  return {
-    sells,
-    count: sells.length,
-  };
+    });
+
+    // DEBUG: Log results
+    console.log('Found sells:', sells.length);
+    if (sells.length > 0) {
+      console.log('Sample sell dates:', {
+        id: sells[0].id,
+        createdAt: sells[0].createdAt,
+        saleDate: sells[0].saleDate,
+        invoiceNo: sells[0].invoiceNo
+      });
+    }
+
+    return {
+      sells,
+      count: sells.length,
+    };
+  } catch (error) {
+    console.error('Error fetching sells:', error);
+    throw error;
+  }
 };
 
 // Get all Sells filtered by user's shops

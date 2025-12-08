@@ -71,7 +71,6 @@ console.log('req  :', req.query);
     endDate,
     userId,
   });
-console.log('result  :', result);
   res.status(httpStatus.OK).send({
     success: true,
     ...result,
