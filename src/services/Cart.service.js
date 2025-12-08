@@ -910,119 +910,28 @@ const checkoutCart = async (cartId, checkoutData, userId) => {
   };
 };
 const convertOrderToCart = async (sellId, userId) => {
-  // Get user with branch information
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    include: { branch: true },
-  });
+  console.log('🚀 [convertOrderToCart] START - Function called');
+  console.log('📝 [convertOrderToCart] Parameters:', { sellId, userId });
 
-  if (!user) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
-  }
+  try {
+    // Get user with branch information
+    console.log('👤 [convertOrderToCart] Fetching user with ID:', userId);
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { branch: true },
+    });
 
-  // Fetch sell with all necessary relations
-  const sell = await prisma.sell.findUnique({
-    where: { id: sellId },
-    include: {
-      customer: true,
-      items: {
-        include: {
-          shop: true,
-          product: {
-            include: {
-              category: true,
-              unitOfMeasure: true,
-            },
-          },
-          unitOfMeasure: true,
-          batches: true, // Include batches for stock reversal if needed
-        },
-      },
-    },
-  });
+    console.log('👤 [convertOrderToCart] User found:', user ? 'Yes' : 'No');
+    if (!user) {
+      console.error('❌ [convertOrderToCart] User not found');
+      throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
+    }
+    console.log('🏢 [convertOrderToCart] User branch ID:', user.branchId);
 
-  if (!sell) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Order not found');
-  }
-
-  // Validation checks
-  if (sell.locked) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      'Cannot convert locked order to cart',
-    );
-  }
-
-  // Check if sell status is allowed for conversion
-  const allowedStatuses = ['PENDING', 'APPROVED', 'NOT_APPROVED'];
-  if (!allowedStatuses.includes(sell.saleStatus)) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      `Order with status ${sell.saleStatus} cannot be converted to cart. Only pending or approved orders can be converted.`,
-    );
-  }
-
-  // Check if this order already has an associated cart
-  const existingCart = await prisma.addToCart.findFirst({
-    where: {
-      customerId: sell.customerId,
-      isCheckedOut: false,
-      OR: [
-        { notes: { contains: `Converted from order: ${sell.invoiceNo}` } },
-        { notes: { contains: sellId } },
-      ],
-    },
-  });
-
-  if (existingCart) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      'A cart already exists for this order conversion',
-    );
-  }
-
-  // IMPORTANT: If the sell has affected stock (batches), you might want to reverse stock transactions
-  // This depends on your business logic
-  if (sell.items.some((item) => item.batches && item.batches.length > 0)) {
-    console.log(
-      'Warning: This order has batch transactions that may need to be reversed',
-    );
-    // Optional: Add stock reversal logic here
-    // await reverseStockTransactions(sell.items);
-  }
-
-  // Start a transaction to ensure data consistency
-  return prisma.$transaction(async (prisma) => {  // REMOVED: await
-    // Create a new cart from the sell
-    const newCart = await prisma.addToCart.create({
-      data: {
-        userId,
-        branchId: user.branchId,
-        customerId: sell.customerId,
-        totalItems: sell.totalProducts,
-        totalAmount: sell.grandTotal,
-        isCheckedOut: false,
-        isWaitlist: false,
-        notes: `Converted from order: ${sell.invoiceNo} (Original Status: ${sell.saleStatus})`,
-        createdById: userId,
-        updatedById: userId,
-        items: {
-          create: sell.items.map((item) => ({
-            shopId: item.shopId,
-            productId: item.productId,
-            unitOfMeasureId: item.unitOfMeasureId,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            totalPrice: item.totalPrice,
-            notes: item.itemSaleStatus
-              ? `Previous item status: ${item.itemSaleStatus}`
-              : null,
-            isWaitlist: false,
-            createdById: userId,
-            updatedById: userId,
-          })),
-        },
-      },
+    // Fetch sell with all necessary relations
+    console.log('📦 [convertOrderToCart] Fetching sell with ID:', sellId);
+    const sell = await prisma.sell.findUnique({
+      where: { id: sellId },
       include: {
         customer: true,
         items: {
@@ -1035,29 +944,244 @@ const convertOrderToCart = async (sellId, userId) => {
               },
             },
             unitOfMeasure: true,
+            batches: true,
           },
         },
       },
     });
 
-    // Delete the sell and all related records
-    // Note: This will cascade delete sell items and their batches based on your schema relations
-    await prisma.sell.delete({
-      where: { id: sellId },
+    console.log('📦 [convertOrderToCart] Sell found:', sell ? 'Yes' : 'No');
+    if (!sell) {
+      console.error('❌ [convertOrderToCart] Sell not found');
+      throw new ApiError(httpStatus.NOT_FOUND, 'Order not found');
+    }
+
+    console.log('📊 [convertOrderToCart] Sell details:', {
+      id: sell.id,
+      invoiceNo: sell.invoiceNo,
+      saleStatus: sell.saleStatus,
+      locked: sell.locked,
+      customerId: sell.customerId,
+      itemsCount: sell.items?.length || 0,
+      grandTotal: sell.grandTotal,
+      totalProducts: sell.totalProducts,
     });
 
-    return {
-      cart: newCart,
-      originalOrder: {
-        invoiceNo: sell.invoiceNo,
-        saleStatus: sell.saleStatus,
-        grandTotal: sell.grandTotal,
-        totalProducts: sell.totalProducts,
+    // Validation checks
+    console.log('🔍 [convertOrderToCart] Checking if sell is locked:', sell.locked);
+    if (sell.locked) {
+      console.error('❌ [convertOrderToCart] Sell is locked, cannot convert');
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'Cannot convert locked order to cart',
+      );
+    }
+
+    // Check if sell status is allowed for conversion
+    const allowedStatuses = ['PENDING', 'APPROVED', 'NOT_APPROVED'];
+    console.log('🔍 [convertOrderToCart] Checking sell status:', {
+      currentStatus: sell.saleStatus,
+      allowedStatuses,
+      isAllowed: allowedStatuses.includes(sell.saleStatus),
+    });
+
+    if (!allowedStatuses.includes(sell.saleStatus)) {
+      console.error('❌ [convertOrderToCart] Sell status not allowed for conversion');
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        `Order with status ${sell.saleStatus} cannot be converted to cart. Only pending or approved orders can be converted.`,
+      );
+    }
+
+    // Check if this order already has an associated cart
+    console.log('🔍 [convertOrderToCart] Checking for existing cart...');
+    const existingCart = await prisma.addToCart.findFirst({
+      where: {
+        customerId: sell.customerId,
+        isCheckedOut: false,
+        OR: [
+          { notes: { contains: `Converted from order: ${sell.invoiceNo}` } },
+          { notes: { contains: sellId } },
+        ],
       },
-      message:
-        'Order successfully converted to cart and original order deleted',
-    };
-  });
+    });
+
+    console.log('🔍 [convertOrderToCart] Existing cart found:', existingCart ? 'Yes' : 'No');
+    if (existingCart) {
+      console.error('❌ [convertOrderToCart] Cart already exists for this order');
+      console.log('📝 [convertOrderToCart] Existing cart ID:', existingCart.id);
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'A cart already exists for this order conversion',
+      );
+    }
+
+    // Check for batch transactions
+    const hasBatches = sell.items.some((item) => item.batches && item.batches.length > 0);
+    console.log('🔍 [convertOrderToCart] Has batch transactions:', hasBatches);
+    if (hasBatches) {
+      console.warn('⚠️ [convertOrderToCart] This order has batch transactions that may need to be reversed');
+      // Log batch details
+      sell.items.forEach((item, index) => {
+        if (item.batches && item.batches.length > 0) {
+          console.log(`📦 [convertOrderToCart] Item ${index + 1} has ${item.batches.length} batches`);
+        }
+      });
+    }
+
+    // Start a transaction to ensure data consistency
+    console.log('💾 [convertOrderToCart] Starting database transaction...');
+    return prisma.$transaction(async (prisma) => {
+      try {
+        console.log('🛒 [convertOrderToCart] Creating new cart from sell...');
+        
+        // Log cart creation data
+        const cartData = {
+          userId,
+          branchId: user.branchId,
+          customerId: sell.customerId,
+          totalItems: sell.totalProducts,
+          totalAmount: sell.grandTotal,
+          isCheckedOut: false,
+          isWaitlist: false,
+          notes: `Converted from order: ${sell.invoiceNo} (Original Status: ${sell.saleStatus})`,
+          createdById: userId,
+          updatedById: userId,
+          items: {
+            create: sell.items.map((item, index) => ({
+              shopId: item.shopId,
+              productId: item.productId,
+              unitOfMeasureId: item.unitOfMeasureId,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              totalPrice: item.totalPrice,
+              notes: item.itemSaleStatus
+                ? `Previous item status: ${item.itemSaleStatus}`
+                : null,
+              isWaitlist: false,
+              createdById: userId,
+              updatedById: userId,
+            })),
+          },
+        };
+
+        console.log('📋 [convertOrderToCart] Cart data to create:', {
+          userId,
+          branchId: user.branchId,
+          customerId: sell.customerId,
+          totalItems: sell.totalProducts,
+          totalAmount: sell.grandTotal,
+          itemsCount: sell.items?.length || 0,
+          notes: cartData.notes,
+        });
+
+        const newCart = await prisma.addToCart.create({
+          data: cartData,
+          include: {
+            customer: true,
+            items: {
+              include: {
+                shop: true,
+                product: {
+                  include: {
+                    category: true,
+                    unitOfMeasure: true,
+                  },
+                },
+                unitOfMeasure: true,
+              },
+            },
+          },
+        });
+
+        console.log('✅ [convertOrderToCart] New cart created successfully');
+        console.log('🛒 [convertOrderToCart] New cart details:', {
+          cartId: newCart.id,
+          itemsCount: newCart.items?.length || 0,
+          totalAmount: newCart.totalAmount,
+        });
+
+        // Delete the sell and all related records
+        console.log('🗑️ [convertOrderToCart] Deleting original sell...');
+        console.log('📦 [convertOrderToCart] Deleting sell ID:', sellId);
+        
+        await prisma.sell.delete({
+          where: { id: sellId },
+        });
+
+        console.log('✅ [convertOrderToCart] Sell deleted successfully');
+
+        const result = {
+          cart: newCart,
+          originalOrder: {
+            invoiceNo: sell.invoiceNo,
+            saleStatus: sell.saleStatus,
+            grandTotal: sell.grandTotal,
+            totalProducts: sell.totalProducts,
+          },
+          message: 'Order successfully converted to cart and original order deleted',
+        };
+
+        console.log('🎉 [convertOrderToCart] Conversion completed successfully');
+        console.log('📊 [convertOrderToCart] Result:', {
+          cartId: newCart.id,
+          originalInvoice: sell.invoiceNo,
+          message: result.message,
+        });
+
+        return result;
+      } catch (transactionError) {
+        console.error('❌ [convertOrderToCart] Transaction error:', {
+          error: transactionError.message,
+          stack: transactionError.stack,
+        });
+        throw transactionError;
+      }
+    });
+  } catch (error) {
+    console.error('❌ [convertOrderToCart] Function error:', {
+      errorName: error.name,
+      errorMessage: error.message,
+      errorCode: error.code,
+      errorStack: error.stack,
+      sellId,
+      userId,
+    });
+
+    // Check for specific Prisma errors
+    if (error.code) {
+      console.error('🔧 [convertOrderToCart] Prisma error code:', error.code);
+      
+      // Common Prisma error codes
+      switch (error.code) {
+        case 'P2002':
+          console.error('🔧 [convertOrderToCart] Unique constraint failed');
+          break;
+        case 'P2003':
+          console.error('🔧 [convertOrderToCart] Foreign key constraint failed');
+          break;
+        case 'P2025':
+          console.error('🔧 [convertOrderToCart] Record to delete not found');
+          break;
+        case 'P2016':
+          console.error('🔧 [convertOrderToCart] Query interpretation error');
+          break;
+      }
+    }
+
+    // Check if it's an ApiError
+    if (error instanceof ApiError) {
+      console.log('⚠️ [convertOrderToCart] This is an ApiError, re-throwing...');
+      throw error;
+    }
+
+    // If it's not an ApiError, wrap it in one
+    console.error('⚠️ [convertOrderToCart] Unknown error, wrapping in ApiError');
+    throw new ApiError(
+      httpStatus.INTERNAL_SERVER_ERROR,
+      error.message || 'Failed to convert order to cart',
+    );
+  }
 };
 
 // Update the service function signature
