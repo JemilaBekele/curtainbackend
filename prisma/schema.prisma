@@ -774,7 +774,8 @@ model AddToCart {
   isWaitlist   Boolean   @default(false)    // true = in wait list
   discount     Float    @default(0)  // Make sure this line exists exactly like this
     notes          String?
-    
+      newdiscount     Float    @default(0)  // Make sure this line exists exactly like this
+
   customerId       String?       @db.Char(36)
   customer         Customer?     @relation(fields: [customerId], references: [id])
   totalItems   Int          @default(0)
