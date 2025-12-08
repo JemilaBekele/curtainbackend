@@ -1837,158 +1837,120 @@ const getAllSellsuser = async ({ startDate, endDate, userId }) => {
     createdById: userId,
   };
 
-  console.log('Request params:', { startDate, endDate, userId });
-
   // If BOTH startDate and endDate are provided, filter by date range
   if (startDate && endDate) {
     try {
       // Parse dates to local time
       const [startYear, startMonth, startDay] = startDate.split('-');
       const [endYear, endMonth, endDay] = endDate.split('-');
-      
-      const startOfRange = new Date(startYear, startMonth - 1, startDay, 0, 0, 0, 0);
-      const endOfRange = new Date(endYear, endMonth - 1, endDay, 23, 59, 59, 999);
-      
+
+      const startOfRange = new Date(
+        startYear,
+        startMonth - 1,
+        startDay,
+        0,
+        0,
+        0,
+        0,
+      );
+      const endOfRange = new Date(
+        endYear,
+        endMonth - 1,
+        endDay,
+        23,
+        59,
+        59,
+        999,
+      );
+
       whereClause.createdAt = {
         gte: startOfRange,
         lte: endOfRange,
       };
-      
-      console.log('Date range filter:', {
-        start: startOfRange.toISOString(),
-        end: endOfRange.toISOString(),
-        humanReadable: `${startDate} to ${endDate}`
-      });
-      
     } catch (error) {
-      console.error('Error parsing dates:', error);
       throw new Error('Invalid date format. Use YYYY-MM-DD');
     }
-  } 
+  }
   // If only startDate is provided, filter from that date to now
   else if (startDate && !endDate) {
     const [year, month, day] = startDate.split('-');
     const startOfRange = new Date(year, month - 1, day, 0, 0, 0, 0);
-    
+
     whereClause.createdAt = {
       gte: startOfRange,
     };
-    
-    console.log('Start date only filter:', {
-      start: startOfRange.toISOString(),
-      humanReadable: `From ${startDate} to now`
-    });
   }
   // If only endDate is provided, filter from 12 months ago to that date
   else if (endDate && !startDate) {
     const [year, month, day] = endDate.split('-');
     const endOfRange = new Date(year, month - 1, day, 23, 59, 59, 999);
     const twelveMonthsAgo = subMonths(new Date(), 12);
-    
+
     whereClause.createdAt = {
       gte: twelveMonthsAgo,
       lte: endOfRange,
     };
-    
-    console.log('End date only filter:', {
-      start: twelveMonthsAgo.toISOString(),
-      end: endOfRange.toISOString(),
-      humanReadable: `From 12 months ago to ${endDate}`
-    });
   }
   // If no dates provided, default to last 12 months
   else {
     whereClause.createdAt = {
       gte: subMonths(new Date(), 12),
     };
-    
-    console.log('Default filter (last 12 months)');
   }
 
-  try {
-    const sells = await prisma.sell.findMany({
-      where: whereClause,
-      orderBy: {
-        createdAt: 'desc',
-      },
-      include: {
-        branch: true,
-        customer: true,
-        createdBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
+  const sells = await prisma.sell.findMany({
+    where: whereClause,
+    orderBy: {
+      createdAt: 'desc',
+    },
+    include: {
+      branch: true,
+      customer: true,
+      createdBy: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
         },
-        items: {
-          include: {
-            product: {
-              include: {
-                unitOfMeasure: true,
-                category: true,
-              },
+      },
+      items: {
+        include: {
+          product: {
+            include: {
+              unitOfMeasure: true,
+              category: true,
             },
-            shop: true,
-            unitOfMeasure: true,
-            batches: {
-              include: {
-                batch: {
-                  include: {
-                    product: true,
-                  },
+          },
+          shop: true,
+          unitOfMeasure: true,
+          batches: {
+            include: {
+              batch: {
+                include: {
+                  product: true,
                 },
               },
             },
           },
         },
-        _count: {
-          select: { items: true },
-        },
       },
-    });
+      _count: {
+        select: { items: true },
+      },
+    },
+  });
 
-    console.log(`Found ${sells.length} sells for user ${userId}`);
-    
-    // Add a warning if filtering for today but no sales found
-    if (startDate && endDate && startDate === endDate && sells.length === 0) {
-      console.log(`⚠️  No sales found for ${startDate}. All sales are from:`);
-      
-      // Get the date range of existing sales for this user
-      const oldestSale = await prisma.sell.findFirst({
-        where: { createdById: userId },
-        orderBy: { createdAt: 'asc' },
-        select: { createdAt: true }
-      });
-      
-      const newestSale = await prisma.sell.findFirst({
-        where: { createdById: userId },
-        orderBy: { createdAt: 'desc' },
-        select: { createdAt: true }
-      });
-      
-      if (oldestSale && newestSale) {
-        console.log(`   From: ${oldestSale.createdAt.toISOString().split('T')[0]}`);
-        console.log(`   To: ${newestSale.createdAt.toISOString().split('T')[0]}`);
-      }
-    }
-
-    return {
-      sells,
-      count: sells.length,
-      // Add metadata for frontend
-      meta: {
-        dateRange: {
-          requestedStart: startDate,
-          requestedEnd: endDate,
-          actualCount: sells.length
-        }
-      }
-    };
-  } catch (error) {
-    console.error('Error fetching sells:', error);
-    throw error;
-  }
+  return {
+    sells,
+    count: sells.length,
+    meta: {
+      dateRange: {
+        requestedStart: startDate,
+        requestedEnd: endDate,
+        actualCount: sells.length,
+      },
+    },
+  };
 };
 
 // Get all Sells filtered by user's shops
