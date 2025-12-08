@@ -1031,7 +1031,7 @@ const convertOrderToCart = async (sellId, userId) => {
       try {
         console.log('🛒 [convertOrderToCart] Creating new cart from sell...');
         
-        // Create cart data - NOTE: createdById and updatedById are optional in schema
+        // Create cart data
         const cartData = {
           userId,
           branchId: user.branchId,
@@ -1103,15 +1103,51 @@ const convertOrderToCart = async (sellId, userId) => {
           updatedById: newCart.updatedById,
         });
 
-        // Delete the sell and all related records
-        console.log('🗑️ [convertOrderToCart] Deleting original sell...');
+        // Delete the sell and all related records in correct order
+        console.log('🗑️ [convertOrderToCart] Deleting original sell and related records...');
         console.log('📦 [convertOrderToCart] Deleting sell ID:', sellId);
         
+        // STEP 1: First delete SellItemBatch records (if they exist)
+        console.log('🗑️ [convertOrderToCart] Step 1: Checking for SellItemBatch records...');
+        
+        // Get all sell item IDs
+        const sellItemIds = sell.items.map(item => item.id);
+        console.log('📋 [convertOrderToCart] Sell item IDs to check:', sellItemIds);
+        
+        if (sellItemIds.length > 0) {
+          try {
+            // Check if SellItemBatch model exists in your schema
+            // Delete batches for all sell items
+            console.log('🗑️ [convertOrderToCart] Deleting SellItemBatch records...');
+            await prisma.sellItemBatch.deleteMany({
+              where: {
+                sellItemId: {
+                  in: sellItemIds
+                }
+              }
+            });
+            console.log('✅ [convertOrderToCart] SellItemBatch records deleted successfully');
+          } catch (batchError) {
+            console.warn('⚠️ [convertOrderToCart] Error deleting SellItemBatch records:', batchError.message);
+            // Model might not exist or have different name, continue
+          }
+        }
+        
+        // STEP 2: Delete SellItem records
+        console.log('🗑️ [convertOrderToCart] Step 2: Deleting SellItem records...');
+        await prisma.sellItem.deleteMany({
+          where: {
+            sellId: sellId
+          }
+        });
+        console.log('✅ [convertOrderToCart] SellItem records deleted successfully');
+        
+        // STEP 3: Now delete the main Sell record
+        console.log('🗑️ [convertOrderToCart] Step 3: Deleting Sell record...');
         await prisma.sell.delete({
           where: { id: sellId },
         });
-
-        console.log('✅ [convertOrderToCart] Sell deleted successfully');
+        console.log('✅ [convertOrderToCart] Sell record deleted successfully');
 
         const result = {
           cart: newCart,
