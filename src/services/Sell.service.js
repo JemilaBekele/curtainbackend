@@ -303,7 +303,9 @@ const createSell = async (sellBody, userId) => {
   }
 
   const invoiceNo = await generateInvoiceNumber();
-
+  // Check if discount exists
+  const checkdiscount = restSellBody.discount || 0;
+  const hasDiscount = checkdiscount > 0;
   // Extract product IDs and shop IDs from items
   const productIds = items.map((item) => item.productId).filter(Boolean);
   const shopIds = items.map((item) => item.shopId).filter(Boolean);
@@ -458,7 +460,8 @@ const createSell = async (sellBody, userId) => {
   const grandTotal = subTotal - discount + vat;
 
   // Determine sale status based on price validation
-  const saleStatus = allItemsApproved ? 'APPROVED' : 'NOT_APPROVED';
+  const saleStatus =
+    allItemsApproved && !hasDiscount ? 'APPROVED' : 'NOT_APPROVED';
 
   // Create only the sell record without stock updates
   const sell = await prisma.sell.create({
@@ -582,16 +585,12 @@ const createSell = async (sellBody, userId) => {
 
           // Remove 'shop:' prefix to match frontend
           io.to(shopId).emit('new-notification', notification);
-          console.log(`✅ Sent real-time notification to shop ${shopId}`);
         });
 
       // Send real-time notifications to users with shop access
       usersWithShopAccess.forEach((user) => {
         // Send to each user individually - remove 'user:' prefix
         io.to(user.id).emit('new-notification', realTimeNotification);
-        console.log(
-          `✅ Sent real-time notification to user ${user.name} (${user.id})`,
-        );
 
         // Also send to user's shops for additional targeting
         user.shops.forEach((shop) => {
@@ -629,7 +628,7 @@ const updateSell = async (sellId, sellBody, userId) => {
   if (!existingSell) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Sale not found');
   }
-
+console.log('sellBody:', sellBody);
   // ✅ DON'T UPDATE IF LOCK IS TRUE
   if (existingSell.locked === true) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Cannot update locked sale');
@@ -676,6 +675,24 @@ const updateSell = async (sellId, sellBody, userId) => {
       'Sale must have at least one item',
     );
   }
+
+  // ✅ DISCOUNT LOGIC: Check if discount exists in the update request
+  // If discount is not provided in the update, use the existing discount
+  const newDiscount =
+    restSellBody.discount !== undefined
+      ? Number(restSellBody.discount)
+      : existingSell.discount;
+
+  // Track if discount is being changed from zero to non-zero or vice versa
+  const existingDiscountWasZero = existingSell.discount === 0;
+  const newDiscountIsZero = newDiscount === 0;
+  const discountChangedFromZeroToNonZero =
+    existingDiscountWasZero && !newDiscountIsZero;
+  const discountChangedFromNonZeroToZero =
+    !existingDiscountWasZero && newDiscountIsZero;
+
+  // ✅ HAS DISCOUNT LOGIC: Sale has discount if newDiscount > 0
+  const hasDiscount = newDiscount > 0;
 
   // Extract product IDs and shop IDs from items
   const productIds = items.map((item) => item.productId).filter(Boolean);
@@ -838,12 +855,36 @@ const updateSell = async (sellId, sellBody, userId) => {
     (sum, item) => sum + item.unitPrice * item.quantity,
     0,
   );
-  const discount = restSellBody.discount || 0;
-  const vat = restSellBody.vat || 0;
+  const discount = newDiscount; // Use the calculated newDiscount
+  const vat = restSellBody.vat || existingSell.vat || 0;
   const grandTotal = subTotal - discount + vat;
 
-  // Determine sale status based on price validation
-  const saleStatus = allItemsApproved ? 'APPROVED' : 'NOT_APPROVED';
+  // ✅ DETERMINE SALE STATUS BASED ON PRICE VALIDATION AND DISCOUNT LOGIC
+  // Rules:
+  // 1. If any item has invalid price → NOT_APPROVED
+  // 2. If there's any discount (newDiscount > 0) → NOT_APPROVED
+  // 3. Only APPROVED if all items have valid prices AND no discount
+
+  let saleStatus;
+
+  // If discount is being added (changed from 0 to > 0), force NOT_APPROVED
+  if (discountChangedFromZeroToNonZero) {
+    saleStatus = 'NOT_APPROVED';
+  }
+  // If discount is being removed (changed from > 0 to 0), check if items are valid
+  else if (discountChangedFromNonZeroToZero) {
+    saleStatus = allItemsApproved ? 'APPROVED' : 'NOT_APPROVED';
+  }
+  // If discount value is not changing, maintain existing logic
+  else {
+    // If there's a discount (existing or new), sale cannot be approved
+    if (hasDiscount) {
+      saleStatus = 'NOT_APPROVED';
+    } else {
+      // No discount, check item prices
+      saleStatus = allItemsApproved ? 'APPROVED' : 'NOT_APPROVED';
+    }
+  }
 
   // Update the sell inside a transaction
   const result = await prisma.$transaction(async (tx) => {
@@ -856,18 +897,18 @@ const updateSell = async (sellId, sellBody, userId) => {
     const sell = await tx.sell.update({
       where: { id: sellId },
       data: {
-        customerId: restSellBody.customerId,
+        customerId: restSellBody.customerId || existingSell.customerId,
         totalProducts: enhancedItems.length,
         subTotal,
         discount,
         vat,
         grandTotal,
         NetTotal: grandTotal,
-        saleStatus, // Set status based on price validation
+        saleStatus, // Set status based on price validation AND discount logic
         saleDate: restSellBody.saleDate
           ? new Date(restSellBody.saleDate)
           : existingSell.saleDate,
-        notes: restSellBody.notes,
+        notes: restSellBody.notes || existingSell.notes,
         updatedById: userId,
         items: {
           create: enhancedItems.map((item) => ({

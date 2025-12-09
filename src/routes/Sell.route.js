@@ -24,15 +24,10 @@ router.get(
 router.get(
   '/api/sells/:id',
   auth,
-  checkPermission('VIEW_SELL'),
+  // checkPermission('VIEW_SELL'),
   sellController.getSell,
 );
-router.get(
-  '/api/sells/:id',
-  auth,
-  checkPermission('VIEW_SELL'),
-  sellController.getSell,
-);
+
 router.patch(
   '/api/sells/With/Lock/:id',
   auth,

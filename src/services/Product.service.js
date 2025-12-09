@@ -361,13 +361,50 @@ const parseFormData = (data) => {
 
   return parsed;
 };
+const generateUniqueProductCode = async () => {
+  const prefix = 'PROD'; // You can customize this prefix
+  const maxAttempts = 10;
+  let productCode;
+
+  // Generate multiple codes at once and check them in a single query
+  const codeAttempts = Array.from({ length: maxAttempts }, () => {
+    const randomNumber = Math.floor(10000 + Math.random() * 90000); // 5-digit random number
+    return `${prefix}-${randomNumber}`;
+  });
+
+  // Check all codes at once
+  const existingProducts = await Promise.all(
+    codeAttempts.map((code) => getProductByCode(code)),
+  );
+
+  // Find the first unique code
+  const uniqueCodeIndex = existingProducts.findIndex((product) => !product);
+
+  if (uniqueCodeIndex !== -1) {
+    productCode = codeAttempts[uniqueCodeIndex];
+  } else {
+    // Fallback: use timestamp for uniqueness
+    const timestamp = Date.now();
+    productCode = `${prefix}-${timestamp}`;
+  }
+
+  return productCode;
+};
 const createProduct = async (productBody, files) => {
+  // Generate product code if not provided
+  let { productCode } = productBody;
+
+  if (!productCode || productCode.trim() === '') {
+    productCode = await generateUniqueProductCode();
+  }
+
   // Check if product with same code already exists
-  if (await getProductByCode(productBody.productCode)) {
+  if (await getProductByCode(productCode)) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Product code already taken');
   }
 
   const parsedData = parseFormData(productBody);
+  parsedData.productCode = productCode; // Add generated code to parsed data
 
   let imageUrl = null;
 

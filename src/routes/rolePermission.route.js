@@ -15,6 +15,11 @@ router.post(
   auth,
   rolePermissionController.assignRolePermissions,
 );
+router.put(
+  '/api/role/permissions/update/assign',
+  auth,
+  rolePermissionController.updateRolePermissions,
+);
 router.get(
   '/api/role-permissions',
   auth,

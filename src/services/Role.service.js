@@ -40,23 +40,32 @@ const createRole = async (roleBody) => {
  * @param {Object} options - Optional include options
  * @returns {Promise<Role>}
  */
+
 const getRoleById = async (id, options = {}) => {
   const role = await prisma.role.findUnique({
     where: { id },
     include: {
-      permissions: options.includePermissions
-        ? {
-            include: {
-              permission: true,
-            },
-          }
-        : false,
       users: options.includeUsers || false,
     },
   });
 
   if (!role) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Role not found');
+  }
+
+  // Get permissions directly without the join table structure
+  if (options.includePermissions !== false) {
+    const permissions = await prisma.permission.findMany({
+      where: {
+        roles: {
+          some: {
+            roleId: id,
+          },
+        },
+      },
+    });
+
+    role.permissions = permissions;
   }
 
   return role;
@@ -126,6 +135,47 @@ const updateRole = async (id, updateBody) => {
   return updatedRole;
 };
 
+const updateRoleWithPermissions = async (roleId, updateBody) => {
+  const { name, description, permissionIds = [] } = updateBody;
+
+  // Ensure role exists
+  const existingRole = await getRoleById(roleId);
+
+  // Validate unique role name
+  if (name && name !== existingRole.name) {
+    const nameExists = await prisma.role.findUnique({ where: { name } });
+    if (nameExists) {
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Role name already exists');
+    }
+  }
+
+  // 1️⃣ Update role basic info
+  await prisma.role.update({
+    where: { id: roleId },
+    data: { name, description },
+  });
+
+  // 2️⃣ Remove all old permissions
+  await prisma.rolePermission.deleteMany({
+    where: { roleId },
+  });
+
+  // 3️⃣ Assign new permissions
+  const rolePermissions = permissionIds.map((pid) => ({
+    roleId,
+    permissionId: pid,
+  }));
+
+  if (rolePermissions.length > 0) {
+    await prisma.rolePermission.createMany({
+      data: rolePermissions,
+      skipDuplicates: true,
+    });
+  }
+
+  // 4️⃣ Return updated role with permissions
+  return getRoleById(roleId, { includePermissions: true });
+};
 /**
  * Delete role by ID
  * @param {string} id
@@ -220,4 +270,5 @@ module.exports = {
   assignPermissions,
   addPermissionToRole,
   removePermissionFromRole,
+  updateRoleWithPermissions,
 };

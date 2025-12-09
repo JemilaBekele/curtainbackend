@@ -17,6 +17,7 @@ const createSell = catchAsync(async (req, res) => {
 
 // Get Sell by ID
 const getSell = catchAsync(async (req, res) => {
+  console.log('Fetching sale with ID:', req.params.id);
   const sell = await sellService.getSellById(req.params.id);
   if (!sell) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Sale not found');
@@ -65,7 +66,6 @@ const getSells = catchAsync(async (req, res) => {
 const getAllSellsuser = catchAsync(async (req, res) => {
   const userId = req.user.id; // ✅ User ID from auth middleware
   const { startDate, endDate } = req.query;
-console.log('req  :', req.query);
   const result = await sellService.getAllSellsuser({
     startDate,
     endDate,

@@ -169,7 +169,75 @@ const assignRolePermissions = async (data) => {
     throw new Error(`Failed to assign role permissions: ${error.message}`);
   }
 };
+const updateAssignedRolePermissions = async (data) => {
+  // Validate
+  if (!data || typeof data !== 'object') {
+    throw new Error('Invalid data: expected an object');
+  }
+  if (!data.roleId) {
+    throw new Error('roleId is required');
+  }
+  if (!Array.isArray(data.permissionIds)) {
+    throw new Error('permissionIds must be an array');
+  }
 
+  try {
+    // Get existing role permissions
+    const existing = await prisma.rolePermission.findMany({
+      where: { roleId: data.roleId },
+      select: { permissionId: true },
+    });
+
+    const existingIds = existing.map((p) => p.permissionId);
+
+    // Determine changes
+    const permissionsToAdd = data.permissionIds.filter(
+      (pid) => !existingIds.includes(pid),
+    );
+
+    const permissionsToRemove = existingIds.filter(
+      (pid) => !data.permissionIds.includes(pid),
+    );
+
+    // TRANSACTION
+    const result = await prisma.$transaction(async (tx) => {
+      // Remove permissions not in the new list
+      if (permissionsToRemove.length > 0) {
+        await tx.rolePermission.deleteMany({
+          where: {
+            roleId: data.roleId,
+            permissionId: { in: permissionsToRemove },
+          },
+        });
+      }
+
+      // Add new permissions
+      const addedPermissions = await Promise.all(
+        permissionsToAdd.map((pid) =>
+          tx.rolePermission.create({
+            data: {
+              roleId: data.roleId,
+              permissionId: pid,
+            },
+          }),
+        ),
+      );
+
+      return {
+        added: addedPermissions.map((rp) => rp.permissionId),
+        removed: permissionsToRemove,
+      };
+    });
+
+    return {
+      message: 'Role permissions updated successfully',
+      ...result,
+      finalPermissions: data.permissionIds,
+    };
+  } catch (error) {
+    throw new Error(`Failed to update role permissions: ${error.message}`);
+  }
+};
 /**
  * Get role-permission relationship by ID
  * @param {string} id
@@ -271,4 +339,5 @@ module.exports = {
   deleteRolePermission,
   deleteRolePermissionByRelation,
   assignRolePermissions,
+  updateAssignedRolePermissions,
 };

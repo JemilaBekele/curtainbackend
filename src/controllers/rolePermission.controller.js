@@ -25,6 +25,20 @@ const assignRolePermissions = catchAsync(async (req, res) => {
     rolePermission,
   });
 });
+const updateRolePermissions = catchAsync(async (req, res) => {
+  const { roleId, permissionIds } = req.body;
+
+  const result = await rolePermissionService.updateAssignedRolePermissions({
+    roleId,
+    permissionIds,
+  });
+
+  res.status(httpStatus.OK).send({
+    success: true,
+    message: 'Role permissions updated successfully',
+    ...result,
+  });
+});
 // Get Role-Permission by ID
 const getRolePermissionById = catchAsync(async (req, res) => {
   const rolePermission = await rolePermissionService.getRolePermissionById(
@@ -69,6 +83,7 @@ const deleteRolePermissionByRelation = catchAsync(async (req, res) => {
 });
 
 module.exports = {
+  updateRolePermissions,
   createRolePermission,
   getRolePermissionById,
   getAllRolePermissions,
