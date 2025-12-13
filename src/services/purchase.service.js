@@ -9,6 +9,8 @@ const getPurchaseById = async (id) => {
     include: {
       supplier: true,
       store: true,
+      createdBy: true,
+      updatedBy: true,
       items: {
         include: {
           product: true,
@@ -86,7 +88,7 @@ const getAllPurchases = async (filter = {}) => {
 };
 
 // Create Purchase
-const createPurchase = async (purchaseBody) => {
+const createPurchase = async (purchaseBody, userId) => {
   // Check if invoice number already exists
   if (await getPurchaseByInvoiceNo(purchaseBody.invoiceNo)) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Invoice number already taken');
@@ -160,6 +162,8 @@ const createPurchase = async (purchaseBody) => {
         totalProducts,
         subTotal,
         grandTotal,
+        createdById: userId, // Add created by user ID here
+
         items: {
           create: validatedItems.map((item) => ({
             productId: item.productId,
@@ -181,6 +185,7 @@ const createPurchase = async (purchaseBody) => {
         },
         supplier: true,
         store: true,
+        createdBy: true, // Include createdBy relation in the response
       },
     });
 

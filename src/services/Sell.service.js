@@ -251,14 +251,13 @@ const getAllSells = async ({
 const generateInvoiceNumber = async () => {
   // Get the current year and month
   const now = new Date();
-  const year = now.getFullYear().toString().slice(-2);
   const month = (now.getMonth() + 1).toString().padStart(2, '0');
 
   // Find the latest invoice for this month
   const latestSell = await prisma.sell.findFirst({
     where: {
       invoiceNo: {
-        startsWith: `INV-${year}${month}`,
+        startsWith: `INV-${month}`,
       },
     },
     orderBy: {
@@ -277,7 +276,7 @@ const generateInvoiceNumber = async () => {
   }
 
   // Format: INV-YYMM-0001
-  return `INV-${year}${month}-${sequence.toString().padStart(4, '0')}`;
+  return `INV-${month}-${sequence.toString().padStart(4, '0')}`;
 };
 // Create Sell
 // Create Sell
@@ -628,7 +627,6 @@ const updateSell = async (sellId, sellBody, userId) => {
   if (!existingSell) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Sale not found');
   }
-console.log('sellBody:', sellBody);
   // ✅ DON'T UPDATE IF LOCK IS TRUE
   if (existingSell.locked === true) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Cannot update locked sale');
@@ -1016,16 +1014,13 @@ console.log('sellBody:', sellBody);
 
           // Remove 'shop:' prefix to match frontend
           io.to(shopId).emit('new-notification', notification);
-          console.log(`✅ Sent real-time notification to shop ${shopId}`);
         });
 
       // Send real-time notifications to users with shop access
       usersWithShopAccess.forEach((user) => {
         // Send to each user individually - remove 'user:' prefix
         io.to(user.id).emit('new-notification', realTimeNotification);
-        console.log(
-          `✅ Sent real-time notification to user ${user.name} (${user.id})`,
-        );
+       
 
         // Also send to user's shops for additional targeting
         user.shops.forEach((shop) => {

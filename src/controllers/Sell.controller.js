@@ -17,7 +17,6 @@ const createSell = catchAsync(async (req, res) => {
 
 // Get Sell by ID
 const getSell = catchAsync(async (req, res) => {
-  console.log('Fetching sale with ID:', req.params.id);
   const sell = await sellService.getSellById(req.params.id);
   if (!sell) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Sale not found');
