@@ -1249,7 +1249,7 @@ const convertOrderToCart = async (sellId, userId) => {
 
 // Update the service function signature
 const addToWaitlist = async (data, userId) => {
-  const { cartItemIds, note } = data; // Remove customerId from parameters
+  const { cartItemIds, note } = data;
   console.log('addToWaitlist called with:', data);
 
   // Validate input
@@ -1283,7 +1283,7 @@ const addToWaitlist = async (data, userId) => {
       unitOfMeasure: true,
       cart: {
         include: {
-          customer: true, // Include customer to get customerId
+          customer: true,
         },
       },
     },
@@ -1327,24 +1327,6 @@ const addToWaitlist = async (data, userId) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Customer not found');
   }
 
-  // IMPORTANT: Update the cart to mark as waitlist
-  await prisma.addToCart.update({
-    where: { id: cartId },
-    data: {
-      isWaitlist: true, // Mark cart as waitlist
-    },
-  });
-
-  // Also mark the specific cart items as waitlist
-  await prisma.cartItem.updateMany({
-    where: {
-      id: { in: cartItemIds },
-    },
-    data: {
-      isWaitlist: true, // Mark cart items as waitlist
-    },
-  });
-
   // Check for existing waitlist items
   const existingWaitlistItems = await prisma.waitlist.findMany({
     where: {
@@ -1353,12 +1335,9 @@ const addToWaitlist = async (data, userId) => {
     },
   });
 
-  const waitlistResults = [];
-  const errors = [];
-
-  // Process each cart item
-  for (const cartItem of cartItems) {
-    try {
+  // Process all cart items using Promise.allSettled
+  const processingResults = await Promise.allSettled(
+    cartItems.map(async (cartItem) => {
       // Check if this specific cart item already has a waitlist entry
       const existingItem = existingWaitlistItems.find(
         (item) => item.cartItemId === cartItem.id,
@@ -1395,7 +1374,7 @@ const addToWaitlist = async (data, userId) => {
         waitlist = await prisma.waitlist.create({
           data: {
             userId,
-            customerId, // ← Use customerId from cart
+            customerId,
             branchId: cartItem.cart.branchId || undefined,
             cartId,
             cartItemId: cartItem.id,
@@ -1421,15 +1400,35 @@ const addToWaitlist = async (data, userId) => {
         });
       }
 
-      waitlistResults.push(waitlist);
-    } catch (error) {
+      // Mark the cart item as waitlist
+      await prisma.cartItem.update({
+        where: { id: cartItem.id },
+        data: {
+          isWaitlist: true,
+        },
+      });
+
+      return waitlist;
+    }),
+  );
+
+  // Process results
+  const waitlistResults = [];
+  const errors = [];
+
+  processingResults.forEach((result, index) => {
+    const cartItem = cartItems[index];
+
+    if (result.status === 'fulfilled') {
+      waitlistResults.push(result.value);
+    } else {
       errors.push({
         cartItemId: cartItem.id,
         productName: cartItem.product.name,
-        error: error.message,
+        error: result.reason.message,
       });
     }
-  }
+  });
 
   // If all items failed, throw an error
   if (waitlistResults.length === 0 && errors.length > 0) {
@@ -1440,13 +1439,79 @@ const addToWaitlist = async (data, userId) => {
     );
   }
 
+  // Check if all items in the cart are now waitlisted
+  const cart = await prisma.addToCart.findUnique({
+    where: { id: cartId },
+    include: {
+      items: true,
+    },
+  });
+
+  let cartDeleted = false;
+
+  // If cart exists and has items
+  if (cart && cart.items.length > 0) {
+    const totalCartItems = cart.items.length;
+    const waitlistedItems = cart.items.filter((item) => item.isWaitlist).length;
+
+    // If ALL items in the cart are waitlisted, delete the cart
+    if (totalCartItems > 0 && waitlistedItems === totalCartItems) {
+      try {
+        // First, update all waitlist records to remove cart reference
+        // This is important because you're deleting the cart
+        await prisma.waitlist.updateMany({
+          where: {
+            cartId,
+          },
+          data: {
+            cartId: null, // Remove reference to cart since it's being deleted
+          },
+        });
+
+        // Now delete the cart
+        await prisma.addToCart.delete({
+          where: { id: cartId },
+        });
+
+        cartDeleted = true;
+        console.log(`Cart ${cartId} deleted - all items moved to waitlist`);
+      } catch (deleteError) {
+        console.error(`Failed to delete cart ${cartId}:`, deleteError);
+        errors.push({
+          type: 'CART_DELETE_ERROR',
+          cartId,
+          error: deleteError.message,
+        });
+
+        // Even if deletion fails, mark the cart as waitlist
+        await prisma.addToCart.update({
+          where: { id: cartId },
+          data: {
+            isWaitlist: true,
+          },
+        });
+      }
+    } else {
+      // Only mark as waitlist, don't delete (not all items are waitlisted)
+      await prisma.addToCart.update({
+        where: { id: cartId },
+        data: {
+          isWaitlist: true,
+        },
+      });
+    }
+  }
+
   return {
     success: true,
-    message: `Successfully added ${waitlistResults.length} item(s) to waitlist`,
+    message: cartDeleted
+      ? `Successfully added ${waitlistResults.length} item(s) to waitlist and deleted empty cart`
+      : `Successfully added ${waitlistResults.length} item(s) to waitlist`,
     totalItems: cartItems.length,
     successfulItems: waitlistResults.length,
     failedItems: errors.length,
     waitlistItems: waitlistResults,
+    cartDeleted,
     errors: errors.length > 0 ? errors : undefined,
   };
 };
@@ -1633,7 +1698,44 @@ const convertCustomerWaitlistToCart = async (customerId, userId) => {
     );
   }
 
-  // Find or create cart for user with customer association
+  // Check if the user already has an active cart with a different customer
+  const existingUserCart = await prisma.addToCart.findFirst({
+    where: {
+      userId,
+      isCheckedOut: false,
+      isWaitlist: false,
+      customerId: {
+        not: customerId, // Different customer than the waitlist customer
+      },
+    },
+    include: {
+      items: true,
+      customer: true,
+    },
+  });
+
+  // If user already has a cart with a different customer, we need to handle this
+  if (existingUserCart && existingUserCart.customerId !== customerId) {
+    // Option 1: Return an error forcing frontend to clear/change the cart
+    throw new ApiError(
+      httpStatus.CONFLICT,
+      'You already have an active cart with a different customer. Please clear your current cart or select the correct customer.',
+      {
+        currentCart: {
+          id: existingUserCart.id,
+          customerId: existingUserCart.customerId,
+          customerName: existingUserCart.customer?.name,
+          itemCount: existingUserCart.items.length,
+        },
+        waitlistCustomer: {
+          id: customerId,
+          name: waitlists[0]?.customer?.name,
+        },
+      },
+    );
+  }
+
+  // Find or create cart for user with the waitlist customer association
   let cart = await prisma.addToCart.findFirst({
     where: {
       userId,
@@ -1780,9 +1882,7 @@ const convertCustomerWaitlistToCart = async (customerId, userId) => {
   );
 
   // Check for failures and log them appropriately
-  const failedProcesses = processingResults.filter(
-    (result) => result.status === 'rejected',
-  );
+  processingResults.filter((result) => result.status === 'rejected');
 
   // Delete all processed waitlist entries
   if (waitlistIdsToDelete.length > 0) {
@@ -1808,6 +1908,7 @@ const convertCustomerWaitlistToCart = async (customerId, userId) => {
     totalItemsConverted: allConvertedItems.length,
     cart: await getCartById(cart.id),
     customer: waitlists[0]?.customer,
+    requiresUserSelection: false, // Indicates if frontend needs user selection
     message: `${allConvertedItems.length} waitlist items for customer "${waitlists[0]?.customer?.name}" successfully added to cart`,
   };
 };
