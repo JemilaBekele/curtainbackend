@@ -140,17 +140,28 @@ const createSellStockCorrection = async (sellStockCorrectionBody, userId) => {
   const items =
     typeof itemsString === 'string' ? JSON.parse(itemsString) : itemsString;
 
-  // Validate items
-  if (!items || !Array.isArray(items) || items.length === 0) {
+  // Validate items array exists
+  if (!items || !Array.isArray(items)) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
-      'Sell stock correction must have at least one item',
+      'Sell stock correction must have items array',
+    );
+  }
+
+  // Filter out items with zero quantity
+  const nonZeroItems = items.filter((item) => Number(item.quantity) !== 0);
+
+  // Check if there are any items left after filtering
+  if (nonZeroItems.length === 0) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'Sell stock correction must have at least one item with non-zero quantity',
     );
   }
 
   // Validate individual item properties and calculate totals
   let totalCorrectionAmount = 0;
-  const itemsWithCalculations = items.map((item, index) => {
+  const itemsWithCalculations = nonZeroItems.map((item, index) => {
     if (!item.productId) {
       throw new ApiError(
         httpStatus.BAD_REQUEST,
@@ -166,19 +177,15 @@ const createSellStockCorrection = async (sellStockCorrectionBody, userId) => {
     if (
       item.quantity === undefined ||
       item.quantity === null ||
-      Number.isNaN(item.quantity)
+      Number.isNaN(Number(item.quantity))
     ) {
       throw new ApiError(
         httpStatus.BAD_REQUEST,
         `Item ${index + 1} has invalid quantity`,
       );
     }
-    if (item.quantity === 0) {
-      throw new ApiError(
-        httpStatus.BAD_REQUEST,
-        `Item ${index + 1} quantity cannot be zero`,
-      );
-    }
+    // Removed zero quantity validation since we filtered them out
+
     if (!item.unitPrice || item.unitPrice < 0) {
       throw new ApiError(
         httpStatus.BAD_REQUEST,
@@ -192,21 +199,23 @@ const createSellStockCorrection = async (sellStockCorrectionBody, userId) => {
         (sum, batch) => sum + (batch.quantity || 0),
         0,
       );
-      if (batchQuantitySum !== Math.abs(item.quantity)) {
+      // Use the actual quantity (could be negative) for comparison
+      if (batchQuantitySum !== item.quantity) {
         throw new ApiError(
           httpStatus.BAD_REQUEST,
           `Item ${
             index + 1
-          } batch quantities (${batchQuantitySum}) must match item quantity (${Math.abs(
-            item.quantity,
-          )})`,
+          } batch quantities (${batchQuantitySum}) must match item quantity (${
+            item.quantity
+          })`,
         );
       }
     }
 
     // Calculate total price for the item
     const totalPrice = item.unitPrice * Math.abs(item.quantity);
-    totalCorrectionAmount += totalPrice;
+    // For negative quantities, subtract from total
+    totalCorrectionAmount += item.quantity >= 0 ? totalPrice : -totalPrice;
 
     return {
       ...item,
@@ -237,7 +246,7 @@ const createSellStockCorrection = async (sellStockCorrectionBody, userId) => {
           unitOfMeasureId: item.unitOfMeasureId,
           unitPrice: item.unitPrice,
           totalPrice: item.totalPrice,
-          quantity: item.quantity,
+          quantity: item.quantity, // Keep the original negative/positive value
           batches:
             item.batches && item.batches.length > 0
               ? {
@@ -338,14 +347,15 @@ const updateSellStockCorrection = async (
     if (
       item.quantity === undefined ||
       item.quantity === null ||
-      Number.isNaN(item.quantity)
+      Number.isNaN(Number(item.quantity))
     ) {
       throw new ApiError(
         httpStatus.BAD_REQUEST,
         `Item ${index + 1} has invalid quantity`,
       );
     }
-    if (item.quantity === 0) {
+    // Accept negative numbers but not zero
+    if (Number(item.quantity) === 0) {
       throw new ApiError(
         httpStatus.BAD_REQUEST,
         `Item ${index + 1} quantity cannot be zero`,
@@ -364,21 +374,23 @@ const updateSellStockCorrection = async (
         (sum, batch) => sum + (batch.quantity || 0),
         0,
       );
-      if (batchQuantitySum !== Math.abs(item.quantity)) {
+      // Use the actual quantity (could be negative) for comparison
+      if (batchQuantitySum !== item.quantity) {
         throw new ApiError(
           httpStatus.BAD_REQUEST,
           `Item ${
             index + 1
-          } batch quantities (${batchQuantitySum}) must match item quantity (${Math.abs(
-            item.quantity,
-          )})`,
+          } batch quantities (${batchQuantitySum}) must match item quantity (${
+            item.quantity
+          })`,
         );
       }
     }
 
     // Calculate total price for the item
     const totalPrice = item.unitPrice * Math.abs(item.quantity);
-    totalCorrectionAmount += totalPrice;
+    // For negative quantities, subtract from total
+    totalCorrectionAmount += item.quantity >= 0 ? totalPrice : -totalPrice;
 
     return {
       ...item,
@@ -425,7 +437,7 @@ const updateSellStockCorrection = async (
             unitOfMeasureId: item.unitOfMeasureId,
             unitPrice: item.unitPrice,
             totalPrice: item.totalPrice,
-            quantity: item.quantity,
+            quantity: item.quantity, // Keep the original negative/positive value
             batches:
               item.batches && item.batches.length > 0
                 ? {

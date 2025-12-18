@@ -70,7 +70,7 @@ const getAllPurchases = async (filter = {}) => {
   const purchases = await prisma.purchase.findMany({
     where,
     orderBy: {
-      purchaseDate: 'desc',
+      createdAt: 'desc',
     },
     include: {
       supplier: true,

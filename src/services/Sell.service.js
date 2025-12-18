@@ -419,7 +419,6 @@ const createSell = async (sellBody, userId) => {
     }
 
     // ✅ Get standard price from product
-    const standardPrice = product.sellPrice ? Number(product.sellPrice) : 0;
 
     // ✅ Get additional prices for THIS specific shop (both global and shop-specific)
     const shopAdditionalPrices = product.AdditionalPrice.filter(
@@ -427,12 +426,11 @@ const createSell = async (sellBody, userId) => {
     );
 
     // ✅ Check if unit price matches standard price OR any additional price for this shop
-    const isStandardPrice = unitPrice === standardPrice;
     const isAdditionalPrice = shopAdditionalPrices.some(
       (ap) => ap.price === unitPrice,
     );
 
-    const isPriceValid = isStandardPrice || isAdditionalPrice;
+    const isPriceValid = isAdditionalPrice;
 
     // If any item has invalid price, mark the entire sale as not approved
     if (!isPriceValid) {
@@ -818,7 +816,6 @@ const updateSell = async (sellId, sellBody, userId) => {
     }
 
     // ✅ Get standard price from product
-    const standardPrice = product.sellPrice ? Number(product.sellPrice) : 0;
 
     // ✅ Get additional prices for THIS specific shop (both global and shop-specific)
     const shopAdditionalPrices = product.AdditionalPrice.filter(
@@ -826,12 +823,11 @@ const updateSell = async (sellId, sellBody, userId) => {
     );
 
     // ✅ Check if unit price matches standard price OR any additional price for this shop
-    const isStandardPrice = unitPrice === standardPrice;
     const isAdditionalPrice = shopAdditionalPrices.some(
       (ap) => ap.price === unitPrice,
     );
 
-    const isPriceValid = isStandardPrice || isAdditionalPrice;
+    const isPriceValid = isAdditionalPrice;
 
     // If any item has invalid price, mark the entire sale as not approved
     if (!isPriceValid) {
@@ -876,6 +872,7 @@ const updateSell = async (sellId, sellBody, userId) => {
   // If discount value is not changing, maintain existing logic
   else {
     // If there's a discount (existing or new), sale cannot be approved
+    // eslint-disable-next-line no-lonely-if
     if (hasDiscount) {
       saleStatus = 'NOT_APPROVED';
     } else {
@@ -1020,7 +1017,6 @@ const updateSell = async (sellId, sellBody, userId) => {
       usersWithShopAccess.forEach((user) => {
         // Send to each user individually - remove 'user:' prefix
         io.to(user.id).emit('new-notification', realTimeNotification);
-       
 
         // Also send to user's shops for additional targeting
         user.shops.forEach((shop) => {
