@@ -1457,18 +1457,28 @@ const addToWaitlist = async (data, userId) => {
     // If ALL items in the cart are waitlisted, delete the cart
     if (totalCartItems > 0 && waitlistedItems === totalCartItems) {
       try {
-        // First, update all waitlist records to remove cart reference
-        // This is important because you're deleting the cart
+        // CRITICAL: Update all waitlist records FIRST to remove references
         await prisma.waitlist.updateMany({
           where: {
-            cartId,
+            OR: [
+              { cartId },
+              { cartItemId: { in: cart.items.map(item => item.id) } }
+            ]
           },
           data: {
-            cartId: null, // Remove reference to cart since it's being deleted
+            cartId: null,
+            cartItemId: null, // Also remove cartItemId reference
           },
         });
 
-        // Now delete the cart
+        // CRITICAL: Delete all cart items FIRST before deleting the cart
+        await prisma.cartItem.deleteMany({
+          where: {
+            cartId,
+          },
+        });
+
+        // Now delete the cart (it should have no referenced items)
         await prisma.addToCart.delete({
           where: { id: cartId },
         });
