@@ -292,13 +292,6 @@ const changePassword = async (userId, currentPassword, newPassword) => {
 const resetPassword = async (userId, resetBody) => {
   const { newPassword } = resetBody;
 
-  if (newPassword.length < 6) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      'Password must be at least 6 characters long',
-    );
-  }
-
   // Get user
   const user = await getUserById(userId);
   if (!user) {
@@ -315,25 +308,15 @@ const resetPassword = async (userId, resetBody) => {
   }
 
   // Hash new password
-  const hashedPassword = await bcrypt.hash(newPassword, 8);
 
-  // Update password
+  const hashedNewPassword = await bcrypt.hash(newPassword, 8);
+
   const updatedUser = await prisma.user.update({
     where: { id: userId },
-    data: {
-      password: hashedPassword,
-      updatedAt: new Date(),
-    },
-    select: {
-      id: true,
-      email: true,
-      name: true,
+    data: { password: hashedNewPassword },
+    include: {
       role: true,
       branch: true,
-      shops: true,
-      stores: true,
-      createdAt: true,
-      updatedAt: true,
     },
   });
 

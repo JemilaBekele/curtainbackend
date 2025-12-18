@@ -76,5 +76,9 @@ router.post(
   // validate(userValidation.loginSchema),
   authController.login,
 );
-router.put('/api/user/reset-password', auth, authController.resetPassword);
+router.put(
+  '/api/user/reset-password/:userId',
+  auth,
+  authController.resetPassword,
+);
 module.exports = router;

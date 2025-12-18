@@ -61,7 +61,6 @@ const getUserByEmail = catchAsync(async (req, res) => {
 });
 const login = catchAsync(async (req, res) => {
   const { email, password } = req.body;
-  console.log('Login attempt for email:', email, password);
   const user = await authService.login(
     email,
     password,
@@ -94,7 +93,7 @@ const changeUserPassword = async (req, res, next) => {
 
 const resetPassword = async (req, res, next) => {
   try {
-    const userId = req.user.id; // From authentication middleware
+    const { userId } = req.params; // From authentication middleware
     const resetBody = req.body;
 
     const user = await userService.resetPassword(userId, resetBody);
