@@ -1652,29 +1652,34 @@ const convertCustomerWaitlistToCart = async (customerId, userId) => {
     );
   }
 
-  // Check if the user already has an active cart with a different customer
+  // Check if the user already has an active cart with items
   const existingUserCart = await prisma.addToCart.findFirst({
     where: {
       userId,
       isCheckedOut: false,
       isWaitlist: false,
-      customerId: {
-        not: customerId, // Different customer than the waitlist customer
-      },
     },
     include: {
-      items: true,
+      items: {
+        include: {
+          product: true,
+        },
+      },
       customer: true,
     },
   });
 
-  // If user already has a cart with a different customer, we need to handle this
-  if (existingUserCart && existingUserCart.customerId !== customerId) {
-    // Option 1: Return an error forcing frontend to clear/change the cart
-    throw new ApiError(
-      httpStatus.CONFLICT,
-      'You already have an active cart with a different customer. Please clear your current cart or select the correct customer.',
-    );
+  // Check if there are any existing non-waitlist items in the cart
+  if (existingUserCart && existingUserCart.items && existingUserCart.items.length > 0) {
+    // Count non-waitlist items
+    const nonWaitlistItems = existingUserCart.items.filter(item => !item.isWaitlist);
+    
+    if (nonWaitlistItems.length > 0) {
+      throw new ApiError(
+        httpStatus.CONFLICT,
+        'Your cart contains items. Please clear your cart before converting waitlist items.',
+      );
+    }
   }
 
   // Find or create cart for user with the waitlist customer association
