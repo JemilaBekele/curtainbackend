@@ -848,12 +848,16 @@ const clearCart = async (cartId, userId) => {
       where: { cartId },
     });
 
-    // Reset cart totals
+    // Reset cart totals AND clear customer data
     await tx.addToCart.update({
       where: { id: cartId },
       data: {
         totalItems: 0,
         totalAmount: 0,
+        // CLEAR CUSTOMER DATA
+        customerId: null, // This disconnects the customer
+        discount: 0, // Reset discount
+        notes: null, // Clear notes
         updatedById: userId,
       },
     });
@@ -1416,7 +1420,7 @@ const addToWaitlist = async (data, userId) => {
 
   processingResults.forEach((result, index) => {
     const cartItem = cartItems[index];
-    
+
     if (result.status === 'fulfilled') {
       waitlistResults.push(result.value);
     } else {
@@ -1670,10 +1674,16 @@ const convertCustomerWaitlistToCart = async (customerId, userId) => {
   });
 
   // Check if there are any existing non-waitlist items in the cart
-  if (existingUserCart && existingUserCart.items && existingUserCart.items.length > 0) {
+  if (
+    existingUserCart &&
+    existingUserCart.items &&
+    existingUserCart.items.length > 0
+  ) {
     // Count non-waitlist items
-    const nonWaitlistItems = existingUserCart.items.filter(item => !item.isWaitlist);
-    
+    const nonWaitlistItems = existingUserCart.items.filter(
+      (item) => !item.isWaitlist,
+    );
+
     if (nonWaitlistItems.length > 0) {
       throw new ApiError(
         httpStatus.CONFLICT,
