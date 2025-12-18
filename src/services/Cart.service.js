@@ -6,7 +6,10 @@ const sellService = require('./Sell.service');
 // Get Cart by ID
 const getCartById = async (id) => {
   const cart = await prisma.addToCart.findUnique({
-    where: { id },
+    where: {
+      id,
+      isWaitlist: false, // Only show non-waitlisted items
+    },
     include: {
       user: true,
       branch: true,
@@ -100,7 +103,10 @@ const getCartByUserId = async (userId) => {
 const getCartByIdByUser = async (id, userId = null) => {
   // Get the cart with all items first
   const cart = await prisma.addToCart.findUnique({
-    where: { id },
+    where: {
+      id,
+      isWaitlist: false, // Only show non-waitlisted items
+    },
     include: {
       user: true,
       branch: true,
@@ -1400,14 +1406,6 @@ const addToWaitlist = async (data, userId) => {
         });
       }
 
-      // Mark the cart item as waitlist
-      await prisma.cartItem.update({
-        where: { id: cartItem.id },
-        data: {
-          isWaitlist: true,
-        },
-      });
-
       return waitlist;
     }),
   );
@@ -1418,7 +1416,7 @@ const addToWaitlist = async (data, userId) => {
 
   processingResults.forEach((result, index) => {
     const cartItem = cartItems[index];
-
+    
     if (result.status === 'fulfilled') {
       waitlistResults.push(result.value);
     } else {
@@ -1439,89 +1437,35 @@ const addToWaitlist = async (data, userId) => {
     );
   }
 
-  // Check if all items in the cart are now waitlisted
-  const cart = await prisma.addToCart.findUnique({
+  // IMPORTANT: Update the cart to mark as waitlist
+  await prisma.addToCart.update({
     where: { id: cartId },
-    include: {
-      items: true,
+    data: {
+      isWaitlist: true, // Mark cart as waitlist
     },
   });
 
-  let cartDeleted = false;
-
-  // If cart exists and has items
-  if (cart && cart.items.length > 0) {
-    const totalCartItems = cart.items.length;
-    const waitlistedItems = cart.items.filter((item) => item.isWaitlist).length;
-
-    // If ALL items in the cart are waitlisted, delete the cart
-    if (totalCartItems > 0 && waitlistedItems === totalCartItems) {
-      try {
-        // CRITICAL: Update all waitlist records FIRST to remove references
-        await prisma.waitlist.updateMany({
-          where: {
-            OR: [
-              { cartId },
-              { cartItemId: { in: cart.items.map(item => item.id) } }
-            ]
-          },
-          data: {
-            cartId: null,
-            cartItemId: null, // Also remove cartItemId reference
-          },
-        });
-
-        // CRITICAL: Delete all cart items FIRST before deleting the cart
-        await prisma.cartItem.deleteMany({
-          where: {
-            cartId,
-          },
-        });
-
-        // Now delete the cart (it should have no referenced items)
-        await prisma.addToCart.delete({
-          where: { id: cartId },
-        });
-
-        cartDeleted = true;
-        console.log(`Cart ${cartId} deleted - all items moved to waitlist`);
-      } catch (deleteError) {
-        console.error(`Failed to delete cart ${cartId}:`, deleteError);
-        errors.push({
-          type: 'CART_DELETE_ERROR',
-          cartId,
-          error: deleteError.message,
-        });
-
-        // Even if deletion fails, mark the cart as waitlist
-        await prisma.addToCart.update({
-          where: { id: cartId },
-          data: {
-            isWaitlist: true,
-          },
-        });
-      }
-    } else {
-      // Only mark as waitlist, don't delete (not all items are waitlisted)
-      await prisma.addToCart.update({
-        where: { id: cartId },
-        data: {
-          isWaitlist: true,
-        },
-      });
-    }
-  }
+  // Also mark the specific cart items as waitlist
+  await prisma.cartItem.updateMany({
+    where: {
+      id: { in: cartItemIds },
+    },
+    data: {
+      isWaitlist: true, // Mark cart items as waitlist
+    },
+  });
 
   return {
     success: true,
-    message: cartDeleted
-      ? `Successfully added ${waitlistResults.length} item(s) to waitlist and deleted empty cart`
-      : `Successfully added ${waitlistResults.length} item(s) to waitlist`,
+    message: `Successfully added ${waitlistResults.length} item(s) to waitlist`,
     totalItems: cartItems.length,
     successfulItems: waitlistResults.length,
     failedItems: errors.length,
     waitlistItems: waitlistResults,
-    cartDeleted,
+    cartUpdated: {
+      id: cartId,
+      isWaitlist: true,
+    },
     errors: errors.length > 0 ? errors : undefined,
   };
 };
