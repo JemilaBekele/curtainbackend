@@ -1674,18 +1674,6 @@ const convertCustomerWaitlistToCart = async (customerId, userId) => {
     throw new ApiError(
       httpStatus.CONFLICT,
       'You already have an active cart with a different customer. Please clear your current cart or select the correct customer.',
-      {
-        currentCart: {
-          id: existingUserCart.id,
-          customerId: existingUserCart.customerId,
-          customerName: existingUserCart.customer?.name,
-          itemCount: existingUserCart.items.length,
-        },
-        waitlistCustomer: {
-          id: customerId,
-          name: waitlists[0]?.customer?.name,
-        },
-      },
     );
   }
 
