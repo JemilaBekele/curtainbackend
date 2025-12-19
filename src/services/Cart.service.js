@@ -1770,7 +1770,7 @@ const convertCustomerWaitlistToCart = async (customerId, userId) => {
     cart = await prisma.addToCart.create({
       data: {
         userId,
-        customerId,
+        // customerId,
         branchId: user.branchId || firstWaitlist.branchId,
         isCheckedOut: false,
         isWaitlist: false,
