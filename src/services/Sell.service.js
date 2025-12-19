@@ -276,7 +276,7 @@ const generateInvoiceNumber = async () => {
   }
 
   // Format: INV-YYMM-0001
-  return `INV-${month}-${sequence.toString().padStart(4, '0')}`;
+  return `INV-${sequence.toString().padStart(4, '0')}`;
 };
 // Create Sell
 // Create Sell
@@ -1052,6 +1052,9 @@ const deleteSell = async (id, userId) => {
   const existingSell = await getSellById(id);
   if (!existingSell) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Sale not found');
+  }
+  if (existingSell.locked === true) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Cannot update locked sale');
   }
 
   // Delete the sell with stock reversal
