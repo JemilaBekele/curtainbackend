@@ -852,7 +852,6 @@ const assignCustomerToCart = async (cartId, customerId, discount, notes) => {
           select: {
             id: true,
             name: true,
-            email: true,
             // Add other customer fields you need
           },
         },
