@@ -746,9 +746,18 @@ const removeItemFromCart = async (cartItemId) => {
 };
 const assignCustomerToCart = async (cartId, customerId, discount, notes) => {
   try {
+    // Validate inputs
+    if (!cartId) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'Cart ID and Customer ID are required',
+      );
+    }
+
     // Validate customer exists
     const customer = await prisma.customer.findUnique({
       where: { id: customerId },
+      select: { id: true }, // Only select what you need
     });
 
     if (!customer) {
@@ -771,15 +780,26 @@ const assignCustomerToCart = async (cartId, customerId, discount, notes) => {
       );
     }
 
+    // Normalize inputs for comparison
+    const normalizedDiscount =
+      discount !== undefined && discount !== null && discount !== ''
+        ? parseFloat(discount)
+        : undefined;
+
+    const normalizedNotes =
+      notes !== undefined && notes !== null && notes !== ''
+        ? notes.trim()
+        : undefined;
+
     // Check if update is needed
     const discountSame =
-      discount === undefined ||
-      discount === null ||
-      cart.discount === parseFloat(discount);
+      normalizedDiscount === undefined || cart.discount === normalizedDiscount;
+
     const notesSame =
-      notes === undefined || notes === null || cart.notes === notes;
+      normalizedNotes === undefined || cart.notes === normalizedNotes;
 
     if (cart.customerId === customerId && discountSame && notesSame) {
+      // No changes needed, return current cart
       return cart;
     }
 
@@ -791,32 +811,52 @@ const assignCustomerToCart = async (cartId, customerId, discount, notes) => {
     };
 
     // Add discount if provided
-    if (discount !== undefined && discount !== null) {
-      const discountValue = parseFloat(discount);
-      if (isNaN(discountValue)) {
+    if (normalizedDiscount !== undefined) {
+      if (isNaN(normalizedDiscount)) {
         throw new ApiError(
           httpStatus.BAD_REQUEST,
           'Discount must be a valid number',
         );
       }
-      if (discountValue < 0) {
+
+      if (normalizedDiscount < 0) {
         throw new ApiError(
           httpStatus.BAD_REQUEST,
           'Discount cannot be negative',
         );
       }
-      updateData.discount = discountValue;
+
+      // Optional: Add maximum discount validation
+      if (normalizedDiscount > 100) {
+        // Assuming percentage discount
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          'Discount cannot exceed 100%',
+        );
+      }
+
+      updateData.discount = normalizedDiscount;
     }
 
     // Add notes if provided
-    if (notes !== undefined && notes !== null) {
-      updateData.notes = notes;
+    if (normalizedNotes !== undefined) {
+      updateData.notes = normalizedNotes;
     }
 
     // Update cart
     const updatedCart = await prisma.addToCart.update({
       where: { id: cartId },
       data: updateData,
+      include: {
+        customer: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            // Add other customer fields you need
+          },
+        },
+      },
     });
 
     return updatedCart;
@@ -824,6 +864,21 @@ const assignCustomerToCart = async (cartId, customerId, discount, notes) => {
     if (error instanceof ApiError) {
       throw error;
     }
+
+    // Handle Prisma specific errors
+    if (error.code === 'P2025') {
+      throw new ApiError(httpStatus.NOT_FOUND, 'Record not found');
+    }
+
+    if (error.code === 'P2003') {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'Foreign key constraint failed',
+      );
+    }
+
+    // Log unexpected errors for debugging
+    console.error('Error assigning customer to cart:', error);
 
     throw new ApiError(
       httpStatus.INTERNAL_SERVER_ERROR,

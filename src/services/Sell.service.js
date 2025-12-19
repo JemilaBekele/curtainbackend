@@ -1863,7 +1863,13 @@ const cancelSale = async (saleId, userId) => {
 
   return updatedSale;
 };
-const getAllSellsuser = async ({ startDate, endDate, userId }) => {
+const getAllSellsuser = async ({
+  startDate,
+  endDate,
+  userId,
+  customerId,
+  status,
+}) => {
   if (!userId) {
     throw new Error('User ID is required');
   }
@@ -1871,6 +1877,24 @@ const getAllSellsuser = async ({ startDate, endDate, userId }) => {
   const whereClause = {
     createdById: userId,
   };
+
+  // Add customer filter if provided
+  if (customerId) {
+    whereClause.customerId = customerId;
+  }
+
+  // Add status filter if provided
+  if (status) {
+    // Handle multiple statuses (comma-separated) or single status
+    if (status.includes(',')) {
+      const statuses = status.split(',').map((s) => s.trim());
+      whereClause.status = {
+        in: statuses,
+      };
+    } else {
+      whereClause.status = status;
+    }
+  }
 
   // If BOTH startDate and endDate are provided, filter by date range
   if (startDate && endDate) {
@@ -1983,6 +2007,10 @@ const getAllSellsuser = async ({ startDate, endDate, userId }) => {
         requestedStart: startDate,
         requestedEnd: endDate,
         actualCount: sells.length,
+      },
+      filters: {
+        customerId,
+        status,
       },
     },
   };
