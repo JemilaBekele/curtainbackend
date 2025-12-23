@@ -538,6 +538,7 @@ exports.Prisma.SellStockCorrectionItemScalarFieldEnum = {
   quantity: 'quantity',
   unitPrice: 'unitPrice',
   totalPrice: 'totalPrice',
+  itemSaleStatus: 'itemSaleStatus',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };
@@ -951,6 +952,7 @@ exports.ItemSaleStatus = exports.$Enums.ItemSaleStatus = {
 exports.SellStockCorrectionStatus = exports.$Enums.SellStockCorrectionStatus = {
   PENDING: 'PENDING',
   APPROVED: 'APPROVED',
+  PARTIAL: 'PARTIAL',
   REJECTED: 'REJECTED'
 };
 

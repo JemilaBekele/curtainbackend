@@ -303,21 +303,22 @@ export const SaleStatus: {
 export type SaleStatus = (typeof SaleStatus)[keyof typeof SaleStatus]
 
 
+export const SellStockCorrectionStatus: {
+  PENDING: 'PENDING',
+  APPROVED: 'APPROVED',
+  PARTIAL: 'PARTIAL',
+  REJECTED: 'REJECTED'
+};
+
+export type SellStockCorrectionStatus = (typeof SellStockCorrectionStatus)[keyof typeof SellStockCorrectionStatus]
+
+
 export const ItemSaleStatus: {
   PENDING: 'PENDING',
   DELIVERED: 'DELIVERED'
 };
 
 export type ItemSaleStatus = (typeof ItemSaleStatus)[keyof typeof ItemSaleStatus]
-
-
-export const SellStockCorrectionStatus: {
-  PENDING: 'PENDING',
-  APPROVED: 'APPROVED',
-  REJECTED: 'REJECTED'
-};
-
-export type SellStockCorrectionStatus = (typeof SellStockCorrectionStatus)[keyof typeof SellStockCorrectionStatus]
 
 
 export const DocumentType: {
@@ -403,13 +404,13 @@ export type SaleStatus = $Enums.SaleStatus
 
 export const SaleStatus: typeof $Enums.SaleStatus
 
-export type ItemSaleStatus = $Enums.ItemSaleStatus
-
-export const ItemSaleStatus: typeof $Enums.ItemSaleStatus
-
 export type SellStockCorrectionStatus = $Enums.SellStockCorrectionStatus
 
 export const SellStockCorrectionStatus: typeof $Enums.SellStockCorrectionStatus
+
+export type ItemSaleStatus = $Enums.ItemSaleStatus
+
+export const ItemSaleStatus: typeof $Enums.ItemSaleStatus
 
 export type DocumentType = $Enums.DocumentType
 
@@ -42026,6 +42027,7 @@ export namespace Prisma {
     quantity: number | null
     unitPrice: number | null
     totalPrice: number | null
+    itemSaleStatus: $Enums.ItemSaleStatus | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -42039,6 +42041,7 @@ export namespace Prisma {
     quantity: number | null
     unitPrice: number | null
     totalPrice: number | null
+    itemSaleStatus: $Enums.ItemSaleStatus | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -42052,6 +42055,7 @@ export namespace Prisma {
     quantity: number
     unitPrice: number
     totalPrice: number
+    itemSaleStatus: number
     createdAt: number
     updatedAt: number
     _all: number
@@ -42079,6 +42083,7 @@ export namespace Prisma {
     quantity?: true
     unitPrice?: true
     totalPrice?: true
+    itemSaleStatus?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -42092,6 +42097,7 @@ export namespace Prisma {
     quantity?: true
     unitPrice?: true
     totalPrice?: true
+    itemSaleStatus?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -42105,6 +42111,7 @@ export namespace Prisma {
     quantity?: true
     unitPrice?: true
     totalPrice?: true
+    itemSaleStatus?: true
     createdAt?: true
     updatedAt?: true
     _all?: true
@@ -42205,6 +42212,7 @@ export namespace Prisma {
     quantity: number
     unitPrice: number
     totalPrice: number
+    itemSaleStatus: $Enums.ItemSaleStatus
     createdAt: Date
     updatedAt: Date
     _count: SellStockCorrectionItemCountAggregateOutputType | null
@@ -42237,6 +42245,7 @@ export namespace Prisma {
     quantity?: boolean
     unitPrice?: boolean
     totalPrice?: boolean
+    itemSaleStatus?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     correction?: boolean | SellStockCorrectionDefaultArgs<ExtArgs>
@@ -42258,11 +42267,12 @@ export namespace Prisma {
     quantity?: boolean
     unitPrice?: boolean
     totalPrice?: boolean
+    itemSaleStatus?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }
 
-  export type SellStockCorrectionItemOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "correctionId" | "productId" | "shopId" | "unitOfMeasureId" | "quantity" | "unitPrice" | "totalPrice" | "createdAt" | "updatedAt", ExtArgs["result"]["sellStockCorrectionItem"]>
+  export type SellStockCorrectionItemOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "correctionId" | "productId" | "shopId" | "unitOfMeasureId" | "quantity" | "unitPrice" | "totalPrice" | "itemSaleStatus" | "createdAt" | "updatedAt", ExtArgs["result"]["sellStockCorrectionItem"]>
   export type SellStockCorrectionItemInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     correction?: boolean | SellStockCorrectionDefaultArgs<ExtArgs>
     product?: boolean | ProductDefaultArgs<ExtArgs>
@@ -42290,6 +42300,7 @@ export namespace Prisma {
       quantity: number
       unitPrice: number
       totalPrice: number
+      itemSaleStatus: $Enums.ItemSaleStatus
       createdAt: Date
       updatedAt: Date
     }, ExtArgs["result"]["sellStockCorrectionItem"]>
@@ -42674,6 +42685,7 @@ export namespace Prisma {
     readonly quantity: FieldRef<"SellStockCorrectionItem", 'Int'>
     readonly unitPrice: FieldRef<"SellStockCorrectionItem", 'Float'>
     readonly totalPrice: FieldRef<"SellStockCorrectionItem", 'Float'>
+    readonly itemSaleStatus: FieldRef<"SellStockCorrectionItem", 'ItemSaleStatus'>
     readonly createdAt: FieldRef<"SellStockCorrectionItem", 'DateTime'>
     readonly updatedAt: FieldRef<"SellStockCorrectionItem", 'DateTime'>
   }
@@ -45604,6 +45616,7 @@ export namespace Prisma {
     quantity: 'quantity',
     unitPrice: 'unitPrice',
     totalPrice: 'totalPrice',
+    itemSaleStatus: 'itemSaleStatus',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
   };
@@ -49280,6 +49293,7 @@ export namespace Prisma {
     quantity?: IntFilter<"SellStockCorrectionItem"> | number
     unitPrice?: FloatFilter<"SellStockCorrectionItem"> | number
     totalPrice?: FloatFilter<"SellStockCorrectionItem"> | number
+    itemSaleStatus?: EnumItemSaleStatusFilter<"SellStockCorrectionItem"> | $Enums.ItemSaleStatus
     createdAt?: DateTimeFilter<"SellStockCorrectionItem"> | Date | string
     updatedAt?: DateTimeFilter<"SellStockCorrectionItem"> | Date | string
     correction?: XOR<SellStockCorrectionScalarRelationFilter, SellStockCorrectionWhereInput>
@@ -49298,6 +49312,7 @@ export namespace Prisma {
     quantity?: SortOrder
     unitPrice?: SortOrder
     totalPrice?: SortOrder
+    itemSaleStatus?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     correction?: SellStockCorrectionOrderByWithRelationInput
@@ -49320,6 +49335,7 @@ export namespace Prisma {
     quantity?: IntFilter<"SellStockCorrectionItem"> | number
     unitPrice?: FloatFilter<"SellStockCorrectionItem"> | number
     totalPrice?: FloatFilter<"SellStockCorrectionItem"> | number
+    itemSaleStatus?: EnumItemSaleStatusFilter<"SellStockCorrectionItem"> | $Enums.ItemSaleStatus
     createdAt?: DateTimeFilter<"SellStockCorrectionItem"> | Date | string
     updatedAt?: DateTimeFilter<"SellStockCorrectionItem"> | Date | string
     correction?: XOR<SellStockCorrectionScalarRelationFilter, SellStockCorrectionWhereInput>
@@ -49338,6 +49354,7 @@ export namespace Prisma {
     quantity?: SortOrder
     unitPrice?: SortOrder
     totalPrice?: SortOrder
+    itemSaleStatus?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     _count?: SellStockCorrectionItemCountOrderByAggregateInput
@@ -49359,6 +49376,7 @@ export namespace Prisma {
     quantity?: IntWithAggregatesFilter<"SellStockCorrectionItem"> | number
     unitPrice?: FloatWithAggregatesFilter<"SellStockCorrectionItem"> | number
     totalPrice?: FloatWithAggregatesFilter<"SellStockCorrectionItem"> | number
+    itemSaleStatus?: EnumItemSaleStatusWithAggregatesFilter<"SellStockCorrectionItem"> | $Enums.ItemSaleStatus
     createdAt?: DateTimeWithAggregatesFilter<"SellStockCorrectionItem"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"SellStockCorrectionItem"> | Date | string
   }
@@ -52676,6 +52694,7 @@ export namespace Prisma {
     quantity: number
     unitPrice?: number
     totalPrice?: number
+    itemSaleStatus?: $Enums.ItemSaleStatus
     createdAt?: Date | string
     updatedAt?: Date | string
     correction: SellStockCorrectionCreateNestedOneWithoutItemsInput
@@ -52694,6 +52713,7 @@ export namespace Prisma {
     quantity: number
     unitPrice?: number
     totalPrice?: number
+    itemSaleStatus?: $Enums.ItemSaleStatus
     createdAt?: Date | string
     updatedAt?: Date | string
     batches?: SellStockCorrectionBatchUncheckedCreateNestedManyWithoutCorrectionItemInput
@@ -52704,6 +52724,7 @@ export namespace Prisma {
     quantity?: IntFieldUpdateOperationsInput | number
     unitPrice?: FloatFieldUpdateOperationsInput | number
     totalPrice?: FloatFieldUpdateOperationsInput | number
+    itemSaleStatus?: EnumItemSaleStatusFieldUpdateOperationsInput | $Enums.ItemSaleStatus
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     correction?: SellStockCorrectionUpdateOneRequiredWithoutItemsNestedInput
@@ -52722,6 +52743,7 @@ export namespace Prisma {
     quantity?: IntFieldUpdateOperationsInput | number
     unitPrice?: FloatFieldUpdateOperationsInput | number
     totalPrice?: FloatFieldUpdateOperationsInput | number
+    itemSaleStatus?: EnumItemSaleStatusFieldUpdateOperationsInput | $Enums.ItemSaleStatus
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     batches?: SellStockCorrectionBatchUncheckedUpdateManyWithoutCorrectionItemNestedInput
@@ -52736,6 +52758,7 @@ export namespace Prisma {
     quantity: number
     unitPrice?: number
     totalPrice?: number
+    itemSaleStatus?: $Enums.ItemSaleStatus
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -52745,6 +52768,7 @@ export namespace Prisma {
     quantity?: IntFieldUpdateOperationsInput | number
     unitPrice?: FloatFieldUpdateOperationsInput | number
     totalPrice?: FloatFieldUpdateOperationsInput | number
+    itemSaleStatus?: EnumItemSaleStatusFieldUpdateOperationsInput | $Enums.ItemSaleStatus
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -52758,6 +52782,7 @@ export namespace Prisma {
     quantity?: IntFieldUpdateOperationsInput | number
     unitPrice?: FloatFieldUpdateOperationsInput | number
     totalPrice?: FloatFieldUpdateOperationsInput | number
+    itemSaleStatus?: EnumItemSaleStatusFieldUpdateOperationsInput | $Enums.ItemSaleStatus
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -55436,6 +55461,7 @@ export namespace Prisma {
     quantity?: SortOrder
     unitPrice?: SortOrder
     totalPrice?: SortOrder
+    itemSaleStatus?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -55455,6 +55481,7 @@ export namespace Prisma {
     quantity?: SortOrder
     unitPrice?: SortOrder
     totalPrice?: SortOrder
+    itemSaleStatus?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -55468,6 +55495,7 @@ export namespace Prisma {
     quantity?: SortOrder
     unitPrice?: SortOrder
     totalPrice?: SortOrder
+    itemSaleStatus?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -64212,6 +64240,7 @@ export namespace Prisma {
     quantity: number
     unitPrice?: number
     totalPrice?: number
+    itemSaleStatus?: $Enums.ItemSaleStatus
     createdAt?: Date | string
     updatedAt?: Date | string
     correction: SellStockCorrectionCreateNestedOneWithoutItemsInput
@@ -64228,6 +64257,7 @@ export namespace Prisma {
     quantity: number
     unitPrice?: number
     totalPrice?: number
+    itemSaleStatus?: $Enums.ItemSaleStatus
     createdAt?: Date | string
     updatedAt?: Date | string
     batches?: SellStockCorrectionBatchUncheckedCreateNestedManyWithoutCorrectionItemInput
@@ -64661,6 +64691,7 @@ export namespace Prisma {
     quantity?: IntFilter<"SellStockCorrectionItem"> | number
     unitPrice?: FloatFilter<"SellStockCorrectionItem"> | number
     totalPrice?: FloatFilter<"SellStockCorrectionItem"> | number
+    itemSaleStatus?: EnumItemSaleStatusFilter<"SellStockCorrectionItem"> | $Enums.ItemSaleStatus
     createdAt?: DateTimeFilter<"SellStockCorrectionItem"> | Date | string
     updatedAt?: DateTimeFilter<"SellStockCorrectionItem"> | Date | string
   }
@@ -67477,6 +67508,7 @@ export namespace Prisma {
     quantity: number
     unitPrice?: number
     totalPrice?: number
+    itemSaleStatus?: $Enums.ItemSaleStatus
     createdAt?: Date | string
     updatedAt?: Date | string
     correction: SellStockCorrectionCreateNestedOneWithoutItemsInput
@@ -67493,6 +67525,7 @@ export namespace Prisma {
     quantity: number
     unitPrice?: number
     totalPrice?: number
+    itemSaleStatus?: $Enums.ItemSaleStatus
     createdAt?: Date | string
     updatedAt?: Date | string
     batches?: SellStockCorrectionBatchUncheckedCreateNestedManyWithoutCorrectionItemInput
@@ -68916,6 +68949,7 @@ export namespace Prisma {
     quantity: number
     unitPrice?: number
     totalPrice?: number
+    itemSaleStatus?: $Enums.ItemSaleStatus
     createdAt?: Date | string
     updatedAt?: Date | string
     correction: SellStockCorrectionCreateNestedOneWithoutItemsInput
@@ -68932,6 +68966,7 @@ export namespace Prisma {
     quantity: number
     unitPrice?: number
     totalPrice?: number
+    itemSaleStatus?: $Enums.ItemSaleStatus
     createdAt?: Date | string
     updatedAt?: Date | string
     batches?: SellStockCorrectionBatchUncheckedCreateNestedManyWithoutCorrectionItemInput
@@ -75847,6 +75882,7 @@ export namespace Prisma {
     quantity: number
     unitPrice?: number
     totalPrice?: number
+    itemSaleStatus?: $Enums.ItemSaleStatus
     createdAt?: Date | string
     updatedAt?: Date | string
     product: ProductCreateNestedOneWithoutSellStockCorrectionItemInput
@@ -75863,6 +75899,7 @@ export namespace Prisma {
     quantity: number
     unitPrice?: number
     totalPrice?: number
+    itemSaleStatus?: $Enums.ItemSaleStatus
     createdAt?: Date | string
     updatedAt?: Date | string
     batches?: SellStockCorrectionBatchUncheckedCreateNestedManyWithoutCorrectionItemInput
@@ -76508,6 +76545,7 @@ export namespace Prisma {
     quantity: number
     unitPrice?: number
     totalPrice?: number
+    itemSaleStatus?: $Enums.ItemSaleStatus
     createdAt?: Date | string
     updatedAt?: Date | string
     correction: SellStockCorrectionCreateNestedOneWithoutItemsInput
@@ -76525,6 +76563,7 @@ export namespace Prisma {
     quantity: number
     unitPrice?: number
     totalPrice?: number
+    itemSaleStatus?: $Enums.ItemSaleStatus
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -76595,6 +76634,7 @@ export namespace Prisma {
     quantity?: IntFieldUpdateOperationsInput | number
     unitPrice?: FloatFieldUpdateOperationsInput | number
     totalPrice?: FloatFieldUpdateOperationsInput | number
+    itemSaleStatus?: EnumItemSaleStatusFieldUpdateOperationsInput | $Enums.ItemSaleStatus
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     correction?: SellStockCorrectionUpdateOneRequiredWithoutItemsNestedInput
@@ -76612,6 +76652,7 @@ export namespace Prisma {
     quantity?: IntFieldUpdateOperationsInput | number
     unitPrice?: FloatFieldUpdateOperationsInput | number
     totalPrice?: FloatFieldUpdateOperationsInput | number
+    itemSaleStatus?: EnumItemSaleStatusFieldUpdateOperationsInput | $Enums.ItemSaleStatus
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -78791,6 +78832,7 @@ export namespace Prisma {
     quantity: number
     unitPrice?: number
     totalPrice?: number
+    itemSaleStatus?: $Enums.ItemSaleStatus
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -79155,6 +79197,7 @@ export namespace Prisma {
     quantity?: IntFieldUpdateOperationsInput | number
     unitPrice?: FloatFieldUpdateOperationsInput | number
     totalPrice?: FloatFieldUpdateOperationsInput | number
+    itemSaleStatus?: EnumItemSaleStatusFieldUpdateOperationsInput | $Enums.ItemSaleStatus
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     correction?: SellStockCorrectionUpdateOneRequiredWithoutItemsNestedInput
@@ -79171,6 +79214,7 @@ export namespace Prisma {
     quantity?: IntFieldUpdateOperationsInput | number
     unitPrice?: FloatFieldUpdateOperationsInput | number
     totalPrice?: FloatFieldUpdateOperationsInput | number
+    itemSaleStatus?: EnumItemSaleStatusFieldUpdateOperationsInput | $Enums.ItemSaleStatus
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     batches?: SellStockCorrectionBatchUncheckedUpdateManyWithoutCorrectionItemNestedInput
@@ -79184,6 +79228,7 @@ export namespace Prisma {
     quantity?: IntFieldUpdateOperationsInput | number
     unitPrice?: FloatFieldUpdateOperationsInput | number
     totalPrice?: FloatFieldUpdateOperationsInput | number
+    itemSaleStatus?: EnumItemSaleStatusFieldUpdateOperationsInput | $Enums.ItemSaleStatus
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -80559,6 +80604,7 @@ export namespace Prisma {
     quantity: number
     unitPrice?: number
     totalPrice?: number
+    itemSaleStatus?: $Enums.ItemSaleStatus
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -80844,6 +80890,7 @@ export namespace Prisma {
     quantity?: IntFieldUpdateOperationsInput | number
     unitPrice?: FloatFieldUpdateOperationsInput | number
     totalPrice?: FloatFieldUpdateOperationsInput | number
+    itemSaleStatus?: EnumItemSaleStatusFieldUpdateOperationsInput | $Enums.ItemSaleStatus
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     correction?: SellStockCorrectionUpdateOneRequiredWithoutItemsNestedInput
@@ -80860,6 +80907,7 @@ export namespace Prisma {
     quantity?: IntFieldUpdateOperationsInput | number
     unitPrice?: FloatFieldUpdateOperationsInput | number
     totalPrice?: FloatFieldUpdateOperationsInput | number
+    itemSaleStatus?: EnumItemSaleStatusFieldUpdateOperationsInput | $Enums.ItemSaleStatus
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     batches?: SellStockCorrectionBatchUncheckedUpdateManyWithoutCorrectionItemNestedInput
@@ -80873,6 +80921,7 @@ export namespace Prisma {
     quantity?: IntFieldUpdateOperationsInput | number
     unitPrice?: FloatFieldUpdateOperationsInput | number
     totalPrice?: FloatFieldUpdateOperationsInput | number
+    itemSaleStatus?: EnumItemSaleStatusFieldUpdateOperationsInput | $Enums.ItemSaleStatus
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -81349,6 +81398,7 @@ export namespace Prisma {
     quantity: number
     unitPrice?: number
     totalPrice?: number
+    itemSaleStatus?: $Enums.ItemSaleStatus
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -81680,6 +81730,7 @@ export namespace Prisma {
     quantity?: IntFieldUpdateOperationsInput | number
     unitPrice?: FloatFieldUpdateOperationsInput | number
     totalPrice?: FloatFieldUpdateOperationsInput | number
+    itemSaleStatus?: EnumItemSaleStatusFieldUpdateOperationsInput | $Enums.ItemSaleStatus
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     correction?: SellStockCorrectionUpdateOneRequiredWithoutItemsNestedInput
@@ -81696,6 +81747,7 @@ export namespace Prisma {
     quantity?: IntFieldUpdateOperationsInput | number
     unitPrice?: FloatFieldUpdateOperationsInput | number
     totalPrice?: FloatFieldUpdateOperationsInput | number
+    itemSaleStatus?: EnumItemSaleStatusFieldUpdateOperationsInput | $Enums.ItemSaleStatus
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     batches?: SellStockCorrectionBatchUncheckedUpdateManyWithoutCorrectionItemNestedInput
@@ -81709,6 +81761,7 @@ export namespace Prisma {
     quantity?: IntFieldUpdateOperationsInput | number
     unitPrice?: FloatFieldUpdateOperationsInput | number
     totalPrice?: FloatFieldUpdateOperationsInput | number
+    itemSaleStatus?: EnumItemSaleStatusFieldUpdateOperationsInput | $Enums.ItemSaleStatus
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -82339,6 +82392,7 @@ export namespace Prisma {
     quantity: number
     unitPrice?: number
     totalPrice?: number
+    itemSaleStatus?: $Enums.ItemSaleStatus
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -82348,6 +82402,7 @@ export namespace Prisma {
     quantity?: IntFieldUpdateOperationsInput | number
     unitPrice?: FloatFieldUpdateOperationsInput | number
     totalPrice?: FloatFieldUpdateOperationsInput | number
+    itemSaleStatus?: EnumItemSaleStatusFieldUpdateOperationsInput | $Enums.ItemSaleStatus
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     product?: ProductUpdateOneRequiredWithoutSellStockCorrectionItemNestedInput
@@ -82364,6 +82419,7 @@ export namespace Prisma {
     quantity?: IntFieldUpdateOperationsInput | number
     unitPrice?: FloatFieldUpdateOperationsInput | number
     totalPrice?: FloatFieldUpdateOperationsInput | number
+    itemSaleStatus?: EnumItemSaleStatusFieldUpdateOperationsInput | $Enums.ItemSaleStatus
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     batches?: SellStockCorrectionBatchUncheckedUpdateManyWithoutCorrectionItemNestedInput
@@ -82377,6 +82433,7 @@ export namespace Prisma {
     quantity?: IntFieldUpdateOperationsInput | number
     unitPrice?: FloatFieldUpdateOperationsInput | number
     totalPrice?: FloatFieldUpdateOperationsInput | number
+    itemSaleStatus?: EnumItemSaleStatusFieldUpdateOperationsInput | $Enums.ItemSaleStatus
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }

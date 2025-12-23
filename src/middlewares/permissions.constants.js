@@ -191,10 +191,6 @@ module.exports = {
       name: 'VIEW_PRODUCT_ALL',
       description: 'View all product details',
     },
-    VIEW_BY_CODE: {
-      name: 'VIEW_PRODUCT_BY_CODE',
-      description: 'View product details by product code',
-    },
     LIST: {
       name: 'LIST_PRODUCTS',
       description: 'View list of all products',
@@ -207,17 +203,9 @@ module.exports = {
       name: 'DELETE_PRODUCT',
       description: 'Delete product',
     },
-    MANAGE_UNITS: {
-      name: 'MANAGE_PRODUCT_UNITS',
-      description: 'Manage product unit conversions',
-    },
-    MANAGE_BATCHES: {
-      name: 'MANAGE_PRODUCT_BATCHES',
-      description: 'Manage product batches',
-    },
-    MANAGE_PRICES: {
-      name: 'MANAGE_PRODUCT_PRICES',
-      description: 'Manage additional product prices',
+    VIEW: {
+      name: 'VIEW',
+      description: 'View product details',
     },
   },
   PRODUCT_BATCH: {
@@ -228,6 +216,10 @@ module.exports = {
     VIEW_ALL: {
       name: 'VIEW_ALL_PRODUCT_BATCHES',
       description: 'View all product batches',
+    },
+    VIEW: {
+      name: 'VIEW_PRODUCT_BATCHES',
+      description: 'View detail product batches',
     },
     UPDATE: {
       name: 'UPDATE_PRODUCT_BATCH',

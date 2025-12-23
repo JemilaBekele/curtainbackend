@@ -746,11 +746,6 @@ model SellItemBatch {
   @@map("sell_item_batches")
 }
 
-enum ItemSaleStatus {
-  PENDING
-  DELIVERED
-}
-
 // ==============================
 // 🛒 ADD TO CART MODELS
 // ==============================
@@ -856,7 +851,13 @@ model Waitlist {
 enum SellStockCorrectionStatus {
   PENDING
   APPROVED
+  PARTIAL
   REJECTED
+}
+
+enum ItemSaleStatus {
+  PENDING
+  DELIVERED
 }
 
 model SellStockCorrection {
@@ -897,9 +898,10 @@ model SellStockCorrectionItem {
   unitOfMeasureId String        @db.Char(36)
   unitOfMeasure   UnitOfMeasure @relation(fields: [unitOfMeasureId], references: [id])
 
-  quantity   Int // Can be positive or negative
-  unitPrice  Float @default(0)
-  totalPrice Float @default(0)
+  quantity       Int // Can be positive or negative
+  unitPrice      Float          @default(0)
+  totalPrice     Float          @default(0)
+  itemSaleStatus ItemSaleStatus @default(PENDING)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

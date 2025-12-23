@@ -86,14 +86,18 @@ const updateSellStockCorrection = catchAsync(async (req, res) => {
 
 // Approve Sell Stock Correction
 const approveSellStockCorrection = catchAsync(async (req, res) => {
+  const { deliveredItemIds } = req.body;
+
   const sellStockCorrection =
     await sellStockCorrectionService.approveSellStockCorrection(
       req.params.id,
       req.user.id,
+      deliveredItemIds || [], // Pass the deliveredItemIds array from request body
     );
+
   res.status(httpStatus.OK).send({
     success: true,
-    message: 'Sell stock correction approved successfully',
+    message: 'Sell stock correction updated successfully',
     sellStockCorrection,
   });
 });

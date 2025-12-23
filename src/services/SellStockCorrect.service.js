@@ -121,20 +121,7 @@ const getSellStockCorrectionsBySellId = async (sellId) => {
   return sellStockCorrections;
 };
 
-// Create SellStockCorrection
 const createSellStockCorrection = async (sellStockCorrectionBody, userId) => {
-  // Check if reference already exists
-  // if (
-  //   sellStockCorrectionBody.reference &&
-  //   (await getSellStockCorrectionByReference(sellStockCorrectionBody.reference))
-  // ) {
-  //   throw new ApiError(
-  //     httpStatus.BAD_REQUEST,
-  //     'Sell stock correction reference already taken',
-  //   );
-  // }
-
-  // Parse items if it's a string
   const { items: itemsString, ...restSellStockCorrectionBody } =
     sellStockCorrectionBody;
   const items =
@@ -472,11 +459,11 @@ const updateSellStockCorrection = async (
   return result;
 };
 
-// Delete SellStockCorrection
-
-// Approve SellStockCorrection
-// Approve SellStockCorrection
-const approveSellStockCorrection = async (sellStockCorrectionId, userId) => {
+const approveSellStockCorrection = async (
+  sellStockCorrectionId,
+  userId,
+  deliveredItemIds = [],
+) => {
   const sellStockCorrection = await getSellStockCorrectionById(
     sellStockCorrectionId,
   );
@@ -485,7 +472,7 @@ const approveSellStockCorrection = async (sellStockCorrectionId, userId) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Sell stock correction not found');
   }
 
-  if (sellStockCorrection.status !== 'PENDING') {
+  if (sellStockCorrection.status === 'APPROVED') {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
       `Sell stock correction is already ${sellStockCorrection.status.toLowerCase()}`,
@@ -493,10 +480,58 @@ const approveSellStockCorrection = async (sellStockCorrectionId, userId) => {
   }
 
   const result = await prisma.$transaction(async (tx) => {
-    // Get all unit of measures for the sell stock correction items
-    const unitOfMeasureIds = sellStockCorrection.items.map(
-      (item) => item.unitOfMeasureId,
-    );
+    // First, update the itemSaleStatus for the delivered items
+    if (deliveredItemIds.length > 0) {
+      await tx.sellStockCorrectionItem.updateMany({
+        where: {
+          id: { in: deliveredItemIds },
+          correctionId: sellStockCorrectionId,
+        },
+        data: {
+          itemSaleStatus: 'DELIVERED',
+          updatedAt: new Date(),
+        },
+      });
+    }
+
+    // Fetch updated sell stock correction with items
+    const updatedSellStockCorrection = await tx.sellStockCorrection.findUnique({
+      where: { id: sellStockCorrectionId },
+      include: {
+        items: {
+          include: {
+            batches: true,
+            unitOfMeasure: true,
+          },
+        },
+      },
+    });
+
+    if (!updatedSellStockCorrection) {
+      throw new ApiError(
+        httpStatus.NOT_FOUND,
+        'Sell stock correction not found after update',
+      );
+    }
+
+    // Determine the final status based on delivered items
+    const allItemsCount = updatedSellStockCorrection.items.length;
+    const deliveredItemsCount = updatedSellStockCorrection.items.filter(
+      (item) => item.itemSaleStatus === 'DELIVERED',
+    ).length;
+
+    let finalStatus = 'APPROVED';
+    if (deliveredItemsCount === 0) {
+      finalStatus = 'PENDING';
+    } else if (deliveredItemsCount > 0 && deliveredItemsCount < allItemsCount) {
+      finalStatus = 'PARTIAL';
+    }
+
+    // Get unit of measures
+    const unitOfMeasureIds = updatedSellStockCorrection.items
+      .map((item) => item.unitOfMeasureId)
+      .filter((id) => id);
+
     const unitOfMeasures = await tx.unitOfMeasure.findMany({
       where: { id: { in: unitOfMeasureIds } },
     });
@@ -510,9 +545,9 @@ const approveSellStockCorrection = async (sellStockCorrectionId, userId) => {
     let sell = null;
     let netTotalAdjustment = 0;
 
-    if (sellStockCorrection.sellId) {
+    if (updatedSellStockCorrection.sellId) {
       sell = await tx.sell.findUnique({
-        where: { id: sellStockCorrection.sellId },
+        where: { id: updatedSellStockCorrection.sellId },
         include: {
           items: {
             include: {
@@ -531,9 +566,14 @@ const approveSellStockCorrection = async (sellStockCorrectionId, userId) => {
         throw new ApiError(httpStatus.NOT_FOUND, 'Associated sell not found');
       }
 
-      // Calculate net total adjustment based on stock correction items
-      netTotalAdjustment = sellStockCorrection.items.reduce(
+      // Calculate net total adjustment based on DELIVERED stock correction items only
+      netTotalAdjustment = updatedSellStockCorrection.items.reduce(
         (adjustment, correctionItem) => {
+          // Only include delivered items in the adjustment
+          if (correctionItem.itemSaleStatus !== 'DELIVERED') {
+            return adjustment;
+          }
+
           const unitOfMeasure =
             unitOfMeasureMap[correctionItem.unitOfMeasureId];
 
@@ -553,6 +593,7 @@ const approveSellStockCorrection = async (sellStockCorrectionId, userId) => {
               absoluteQuantity * correctionItem.unitPrice;
             return adjustment + itemValueAdjustment;
           }
+
           // For subtractions: Find the corresponding sell item and use its unit price
           const sellItem = sell.items.find(
             (item) =>
@@ -571,131 +612,197 @@ const approveSellStockCorrection = async (sellStockCorrectionId, userId) => {
       );
     }
 
-    // Prepare all operations for each sell stock correction item
-    const operations = sellStockCorrection.items.flatMap((item) => {
-      const unitOfMeasure = unitOfMeasureMap[item.unitOfMeasureId];
+    // Prepare all operations for each DELIVERED sell stock correction item
+    const operationsPromises = updatedSellStockCorrection.items.map(
+      async (item) => {
+        // Only process delivered items
+        if (item.itemSaleStatus !== 'DELIVERED') {
+          return [];
+        }
 
-      if (!unitOfMeasure) {
-        throw new ApiError(
-          httpStatus.BAD_REQUEST,
-          `Unit of measure not found for item ${item.id}`,
-        );
-      }
+        const unitOfMeasure = unitOfMeasureMap[item.unitOfMeasureId];
 
-      const quantityToUse = item.quantity;
-      const isAddition = quantityToUse > 0;
-      const movementType = isAddition ? 'OUT' : 'IN';
-      const absoluteQuantity = Math.abs(quantityToUse);
-      const notes = isAddition
-        ? `Sell stock subtraction: ${sellStockCorrection.notes || 'correction'}`
-        : `Sell stock addition: ${sellStockCorrection.notes || 'correction'}`;
+        if (!unitOfMeasure) {
+          throw new ApiError(
+            httpStatus.BAD_REQUEST,
+            `Unit of measure not found for item ${item.id}`,
+          );
+        }
 
-      const itemOperations = [];
+        const quantityToUse = item.quantity;
+        const isAddition = quantityToUse > 0;
+        const movementType = isAddition ? 'OUT' : 'IN';
+        const absoluteQuantity = Math.abs(quantityToUse);
+        const notes = isAddition
+          ? `Sell stock subtraction: ${
+              updatedSellStockCorrection.notes || 'correction'
+            }`
+          : `Sell stock addition: ${
+              updatedSellStockCorrection.notes || 'correction'
+            }`;
 
-      // Handle batch-level stock updates if batches are specified
-      if (item.batches && item.batches.length > 0) {
-        // Update stock for each batch
-        item.batches.forEach((correctionBatch) => {
-          const batchQuantity = correctionBatch.quantity;
-          const { batchId } = correctionBatch;
+        const itemOperations = [];
 
-          if (item.shopId) {
-            itemOperations.push(
-              tx.shopStock.upsert({
+        // Handle batch-level stock updates if batches are specified
+        if (item.batches && item.batches.length > 0) {
+          // Check stock availability before processing
+          for (const correctionBatch of item.batches) {
+            const batchQuantity = correctionBatch.quantity;
+            const { batchId } = correctionBatch;
+
+            if (item.shopId) {
+              // Check current stock for this batch
+              const currentStock = await tx.shopStock.findUnique({
                 where: {
                   shopId_batchId: {
                     shopId: item.shopId,
                     batchId,
                   },
                 },
-                update: {
-                  quantity: isAddition
-                    ? { decrement: batchQuantity }
-                    : { increment: batchQuantity },
-                },
-                create: {
-                  shopId: item.shopId,
-                  batchId,
-                  quantity: isAddition ? -batchQuantity : batchQuantity,
-                  unitOfMeasureId: item.unitOfMeasureId,
-                  status: 'Available',
-                },
-              }),
-            );
+              });
 
-            // Create stock ledger entry for each batch
-            itemOperations.push(
-              tx.stockLedger.create({
-                data: {
-                  batchId,
-                  shopId: item.shopId,
-                  movementType,
-                  quantity: batchQuantity,
-                  unitOfMeasureId: item.unitOfMeasureId,
-                  reference:
-                    sellStockCorrection.reference ||
-                    `SELL-CORRECTION-${sellStockCorrection.id}`,
-                  userId,
-                  notes: `${notes} (Batch: ${batchId})`,
-                  movementDate: new Date(),
-                },
-              }),
-            );
+              // For subtractions (OUT movement), check if enough stock exists
+              if (isAddition) {
+                // isAddition means positive quantity (OUT movement)
+                if (currentStock && currentStock.quantity < batchQuantity) {
+                  throw new ApiError(
+                    httpStatus.BAD_REQUEST,
+                    `Insufficient stock for batch ${batchId}. Available: ${currentStock.quantity}, Required: ${batchQuantity}`,
+                  );
+                }
+              }
+
+              itemOperations.push(
+                tx.shopStock.upsert({
+                  where: {
+                    shopId_batchId: {
+                      shopId: item.shopId,
+                      batchId,
+                    },
+                  },
+                  update: {
+                    quantity: isAddition
+                      ? { decrement: batchQuantity }
+                      : { increment: batchQuantity },
+                  },
+                  create: {
+                    shopId: item.shopId,
+                    batchId,
+                    quantity: isAddition ? -batchQuantity : batchQuantity,
+                    unitOfMeasureId: item.unitOfMeasureId,
+                    status: 'Available',
+                  },
+                }),
+              );
+
+              // Create stock ledger entry for each batch
+              itemOperations.push(
+                tx.stockLedger.create({
+                  data: {
+                    batchId,
+                    shopId: item.shopId,
+                    movementType,
+                    quantity: batchQuantity,
+                    unitOfMeasureId: item.unitOfMeasureId,
+                    reference:
+                      updatedSellStockCorrection.reference ||
+                      `SELL-CORRECTION-${updatedSellStockCorrection.id}`,
+                    userId,
+                    notes: `${notes} (Batch: ${batchId})`,
+                    movementDate: new Date(),
+                  },
+                }),
+              );
+            }
           }
-        });
-      } else if (item.shopId) {
-        // Fallback to product-level stock update if no batches specified and shopId exists
-        itemOperations.push(
-          tx.shopStock.upsert({
+        } else if (item.shopId) {
+          // Check product-level stock availability
+          const currentStocks = await tx.shopStock.findMany({
             where: {
-              shopId_batchId: {
-                shopId: item.shopId,
-                batchId: 'no-batch',
+              shopId: item.shopId,
+              batch: {
+                productId: item.productId,
               },
             },
-            update: {
-              quantity: isAddition
-                ? { decrement: absoluteQuantity }
-                : { increment: absoluteQuantity },
+            include: {
+              batch: true,
             },
-            create: {
-              shopId: item.shopId,
-              batchId: 'no-batch',
-              quantity: isAddition ? -absoluteQuantity : absoluteQuantity,
-              unitOfMeasureId: item.unitOfMeasureId,
-              status: 'Available',
-            },
-          }),
-        );
+          });
 
-        // Create stock ledger entry for shop
-        itemOperations.push(
-          tx.stockLedger.create({
-            data: {
-              batchId: null,
-              shopId: item.shopId,
-              movementType,
-              quantity: absoluteQuantity,
-              unitOfMeasureId: item.unitOfMeasureId,
-              reference:
-                sellStockCorrection.reference ||
-                `SELL-CORRECTION-${sellStockCorrection.id}`,
-              userId,
-              notes,
-              movementDate: new Date(),
-            },
-          }),
-        );
-      }
+          const totalAvailableStock = currentStocks.reduce(
+            (sum, stock) => sum + stock.quantity,
+            0,
+          );
 
-      return itemOperations;
-    });
+          // For subtractions (OUT movement), check if enough stock exists
+          if (isAddition) {
+            // isAddition means positive quantity (OUT movement)
+            if (totalAvailableStock < absoluteQuantity) {
+              throw new ApiError(
+                httpStatus.BAD_REQUEST,
+                `Insufficient stock for product. Available: ${totalAvailableStock}, Required: ${absoluteQuantity}`,
+              );
+            }
+          }
 
-    // Flatten all operations and execute them in parallel
-    const allOperations = operations.flat();
-    await Promise.all(allOperations);
+          // Fallback to product-level stock update if no batches specified and shopId exists
+          itemOperations.push(
+            tx.shopStock.upsert({
+              where: {
+                shopId_batchId: {
+                  shopId: item.shopId,
+                  batchId: 'no-batch',
+                },
+              },
+              update: {
+                quantity: isAddition
+                  ? { decrement: absoluteQuantity }
+                  : { increment: absoluteQuantity },
+              },
+              create: {
+                shopId: item.shopId,
+                batchId: 'no-batch',
+                quantity: isAddition ? -absoluteQuantity : absoluteQuantity,
+                unitOfMeasureId: item.unitOfMeasureId,
+                status: 'Available',
+              },
+            }),
+          );
 
-    // Update sell's net total if there's an associated sell
+          // Create stock ledger entry for shop
+          itemOperations.push(
+            tx.stockLedger.create({
+              data: {
+                batchId: null,
+                shopId: item.shopId,
+                movementType,
+                quantity: absoluteQuantity,
+                unitOfMeasureId: item.unitOfMeasureId,
+                reference:
+                  updatedSellStockCorrection.reference ||
+                  `SELL-CORRECTION-${updatedSellStockCorrection.id}`,
+                userId,
+                notes,
+                movementDate: new Date(),
+              },
+            }),
+          );
+        }
+
+        return itemOperations;
+      },
+    );
+
+    // Wait for all promises to resolve and flatten the results
+    const operationsArrays = await Promise.all(operationsPromises);
+    const allOperations = operationsArrays.flat();
+
+    // Execute all operations
+    if (allOperations.length > 0) {
+      await Promise.all(allOperations);
+    }
+
+    // Update sell's net total if there's an associated sell and netTotalAdjustment is not zero
     if (sell && netTotalAdjustment !== 0) {
       const newNetTotal = sell.NetTotal + netTotalAdjustment;
 
@@ -712,36 +819,57 @@ const approveSellStockCorrection = async (sellStockCorrectionId, userId) => {
       });
     }
 
-    // Update sell stock correction status to APPROVED
-    const updatedSellStockCorrection = await tx.sellStockCorrection.update({
+    // Update sell stock correction status based on delivery status
+    const finalSellStockCorrection = await tx.sellStockCorrection.update({
       where: { id: sellStockCorrectionId },
       data: {
-        status: 'APPROVED',
+        status: finalStatus,
         updatedById: userId,
+        updatedAt: new Date(),
+      },
+      include: {
+        items: {
+          select: {
+            id: true,
+            itemSaleStatus: true,
+            productId: true,
+            quantity: true,
+          },
+        },
       },
     });
 
     // Create log entry
+    const deliveredItemsText =
+      deliveredItemIds.length > 0
+        ? `Marked ${deliveredItemIds.length} items as delivered`
+        : 'No items marked as delivered';
+
     await tx.log.create({
       data: {
-        action: `Approved sell stock correction ${
-          sellStockCorrection.reference || sellStockCorrection.id
-        } with ${sellStockCorrection.items.length} items. ${
-          sell
+        action: `Updated sell stock correction ${
+          updatedSellStockCorrection.reference || updatedSellStockCorrection.id
+        }. Status: ${finalStatus}. ${deliveredItemsText}. ${
+          sell && netTotalAdjustment !== 0
             ? `Net total adjusted by ${netTotalAdjustment}`
-            : 'No sell association'
+            : 'No net total adjustment'
         }`,
         userId,
       },
     });
 
     return {
-      ...updatedSellStockCorrection,
-      netTotalAdjustment,
+      ...finalSellStockCorrection,
+      netTotalAdjustment: netTotalAdjustment || 0,
       previousNetTotal: sell ? sell.NetTotal : null,
-      newNetTotal: sell
-        ? Math.max(0, sell.NetTotal + netTotalAdjustment)
-        : null,
+      newNetTotal:
+        sell && netTotalAdjustment !== 0
+          ? Math.max(0, sell.NetTotal + netTotalAdjustment)
+          : sell
+          ? sell.NetTotal
+          : null,
+      deliveredItemsCount,
+      totalItemsCount: allItemsCount,
     };
   });
 
