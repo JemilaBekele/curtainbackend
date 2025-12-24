@@ -104,21 +104,13 @@ const updateCustomer = async (id, updateBody) => {
   });
 };
 const getCustomersWithFallback = async (search = '') => {
-  console.log('🔍 getCustomersWithFallback called with search:', search || '(empty)');
-  
   try {
-    // If searching, return search results
     if (search.trim()) {
-      console.log('📋 Performing search for:', search);
-      
-      // FIXED: Remove 'mode: 'insensitive'' or handle case-insensitive search differently
-      // Option 1: Use toLowerCase for case-insensitive search if your DB doesn't support 'mode'
       const searchLower = search.toLowerCase();
-      
+
       const customers = await prisma.customer.findMany({
         where: {
           OR: [
-            // Use Prisma's string filtering without 'mode' parameter
             { name: { contains: search } },
             { companyName: { contains: search } },
             { phone1: { contains: search } },
@@ -128,34 +120,22 @@ const getCustomersWithFallback = async (search = '') => {
         orderBy: { name: 'asc' },
         take: 50,
       });
-
-      console.log('✅ Search results count:', customers.length);
-      
-      // If you need case-insensitive search and the above doesn't work,
-      // filter results manually after the query
-      const filteredCustomers = search.trim() ? 
-        customers.filter(customer => 
-          customer.name?.toLowerCase().includes(searchLower) ||
-          customer.companyName?.toLowerCase().includes(searchLower) ||
-          customer.phone1?.includes(search) || // phone numbers are usually case-insensitive
-          customer.phone2?.includes(search)
-        ) : customers;
-      
-      console.log('✅ Filtered search results:', filteredCustomers.length);
-      
+      const filteredCustomers = search.trim()
+        ? customers.filter(
+            (customer) =>
+              customer.name?.toLowerCase().includes(searchLower) ||
+              customer.companyName?.toLowerCase().includes(searchLower) ||
+              customer.phone1?.includes(search) || // phone numbers are usually case-insensitive
+              customer.phone2?.includes(search),
+          )
+        : customers;
       return {
         customers: filteredCustomers,
         count: filteredCustomers.length,
         isSearchResults: true,
       };
     }
-
-    // Try to get top customers by sales
     try {
-      console.log('🏆 Attempting to fetch top customers...');
-      
-      // IMPORTANT: Check your actual table and column names
-      // Use Prisma's generated names (run `npx prisma studio` to check)
       const topCustomers = await prisma.$queryRaw`
         SELECT c.*
         FROM Customer c
@@ -164,16 +144,12 @@ const getCustomersWithFallback = async (search = '') => {
         ORDER BY COALESCE(SUM(s.grandTotal), 0) DESC
         LIMIT 10
       `;
-
-      console.log('📊 Raw topCustomers query result type:', typeof topCustomers);
-      console.log('📊 Is array?', Array.isArray(topCustomers));
-      
-      if (topCustomers && Array.isArray(topCustomers) && topCustomers.length > 0) {
-        console.log('✅ Top customers found:', topCustomers.length);
-        
-        // Map raw SQL results to match Prisma model
-        // IMPORTANT: Check your actual column names in the database
-        const mappedCustomers = topCustomers.map(customer => ({
+      if (
+        topCustomers &&
+        Array.isArray(topCustomers) &&
+        topCustomers.length > 0
+      ) {
+        const mappedCustomers = topCustomers.map((customer) => ({
           id: customer.id || customer._id,
           name: customer.name,
           companyName: customer.companyName || customer.companyname,
@@ -184,16 +160,11 @@ const getCustomersWithFallback = async (search = '') => {
           createdAt: customer.createdAt || customer.createdat,
           updatedAt: customer.updatedAt || customer.updatedat,
         }));
-
-        console.log('✅ Mapped customers count:', mappedCustomers.length);
-
         return {
           customers: mappedCustomers,
           count: mappedCustomers.length,
           isTopCustomers: true,
         };
-      } else {
-        console.log('ℹ️ No top customers found or empty result');
       }
     } catch (error) {
       console.error('❌ Error fetching top customers:', error.message);
@@ -202,25 +173,16 @@ const getCustomersWithFallback = async (search = '') => {
     }
 
     // Fallback: get first 10 customers alphabetically
-    console.log('📄 Falling back to default customers...');
     const defaultCustomers = await prisma.customer.findMany({
       orderBy: { name: 'asc' },
       take: 10,
     });
-
-    console.log('✅ Default customers count:', defaultCustomers.length);
-    
     return {
       customers: defaultCustomers,
       count: defaultCustomers.length,
       isDefaultCustomers: true,
     };
-    
   } catch (error) {
-    console.error('💥 Unhandled error in getCustomersWithFallback:', error.message);
-    console.error('💥 Full error:', error);
-    
-    // Return empty result on error
     return {
       customers: [],
       count: 0,
