@@ -33,16 +33,44 @@ const getCustomers = catchAsync(async (req, res) => {
   });
 });
 const getCustomersWithFallback = catchAsync(async (req, res) => {
+  console.log('🎯 getCustomersWithFallback controller called');
+  console.log('📝 Request query:', req.query);
+  console.log('🔍 Search parameter:', req.query.search);
+  console.log('🌐 Request URL:', req.originalUrl);
+  console.log('📊 Request method:', req.method);
+  console.log('🔑 Request headers:', req.headers);
+  
   const { search = '' } = req.query;
+  const searchString = typeof search === 'string' ? search : '';
 
-  const result = await customerService.getCustomersWithFallback(
-    typeof search === 'string' ? search : '',
-  );
+  console.log('📋 Processed search string:', searchString);
 
-  res.status(httpStatus.OK).send({
-    success: true,
-    ...result,
-  });
+  try {
+    console.log('📞 Calling customerService.getCustomersWithFallback...');
+    const result = await customerService.getCustomersWithFallback(searchString);
+    
+    console.log('✅ Service returned:', {
+      success: result.success,
+      count: result.count || 0,
+      isSearchResults: result.isSearchResults,
+      isTopCustomers: result.isTopCustomers,
+      isDefaultCustomers: result.isDefaultCustomers
+    });
+
+    res.status(httpStatus.OK).send({
+      success: true,
+      ...result,
+    });
+  } catch (serviceError) {
+    console.error('❌ Error in customer service:', serviceError.message);
+    console.error('Service error stack:', serviceError.stack);
+    
+    res.status(httpStatus.INTERNAL_SERVER_ERROR).send({
+      success: false,
+      error: 'Failed to fetch customers',
+      message: serviceError.message
+    });
+  }
 });
 
 const updateCustomer = catchAsync(async (req, res) => {
