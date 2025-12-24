@@ -2172,7 +2172,6 @@ const unlockSell = async (id) => {
   // First, get the current state
   const currentSell = await prisma.sell.findUnique({
     where: { id },
-    select: { locked: true },
   });
 
   if (!currentSell) {
