@@ -2009,7 +2009,7 @@ const getAllSellsForStore = async ({
   salesPersonName,
   status,
 } = {}) => {
-  console.log("Function called with params:", {
+  console.log('Function called with params:', {
     startDate,
     endDate,
     userId,
@@ -2018,13 +2018,6 @@ const getAllSellsForStore = async ({
     status,
   });
 
-  // First, let's check if there are any sells without filters
-  console.log("Checking total sells in database...");
-  const totalSells = await prisma.sell.count({
-    where: { saleStatus: { not: 'NOT_APPROVED' } }
-  });
-  console.log("Total sells (excluding NOT_APPROVED):", totalSells);
-
   const whereClause = { saleStatus: { not: 'NOT_APPROVED' } };
   const twelveMonthsAgo = subMonths(new Date(), 12);
 
@@ -2032,40 +2025,16 @@ const getAllSellsForStore = async ({
   const startDateObj = startDate ? new Date(startDate) : undefined;
   const endDateObj = endDate ? new Date(endDate) : undefined;
 
-  console.log("Start date object:", startDateObj);
-  console.log("End date object:", endDateObj);
-  console.log("Current date:", new Date());
-  console.log("Twelve months ago:", twelveMonthsAgo);
-
-  // Let's see what dates we actually have in the database
-  console.log("Checking some sample sells with their dates...");
-  const sampleSells = await prisma.sell.findMany({
-    where: { saleStatus: { not: 'NOT_APPROVED' } },
-    take: 5,
-    select: {
-      id: true,
-      invoiceNo: true,
-      saleDate: true,
-      saleStatus: true,
-    },
-    orderBy: { saleDate: 'desc' }
-  });
-  console.log("Sample sells with dates:", JSON.stringify(sampleSells, null, 2));
-
   // Build the date filter
   if (startDateObj && endDateObj) {
     // Adjust for end date to include the entire day
     const adjustedEndDate = new Date(endDateObj);
     adjustedEndDate.setHours(23, 59, 59, 999);
-    
+
     whereClause.saleDate = {
       gte: startDateObj,
-      lte: adjustedEndDate, // Use adjusted end date
+      lte: adjustedEndDate,
     };
-    console.log("Date range with adjusted end date:", {
-      gte: startDateObj,
-      lte: adjustedEndDate
-    });
   } else if (startDateObj) {
     whereClause.saleDate = {
       gte: startDateObj,
@@ -2075,7 +2044,7 @@ const getAllSellsForStore = async ({
     // Adjust for end date to include the entire day
     const adjustedEndDate = new Date(endDateObj);
     adjustedEndDate.setHours(23, 59, 59, 999);
-    
+
     whereClause.saleDate = {
       gte: twelveMonthsAgo,
       lte: adjustedEndDate,
@@ -2086,12 +2055,8 @@ const getAllSellsForStore = async ({
     };
   }
 
-  console.log("Date filter applied:", whereClause.saleDate);
-
   // Filter by status if provided
   if (status) {
-    console.log("Status filter provided:", status);
-    
     if (Array.isArray(status) && status.length > 0) {
       whereClause.saleStatus = {
         in: status,
@@ -2101,13 +2066,13 @@ const getAllSellsForStore = async ({
     } else if (status === 'all') {
       delete whereClause.saleStatus;
     }
-    console.log("Status filter after processing:", whereClause.saleStatus);
   }
 
   // If userId is provided, get user's shops and filter sells by those shops
+  let userShopIds = [];
   if (userId) {
-    console.log("User ID provided:", userId);
-    
+    console.log('User ID provided:', userId);
+
     const userWithShops = await prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -2117,34 +2082,56 @@ const getAllSellsForStore = async ({
       },
     });
 
-    console.log("User shops found:", userWithShops?.shops?.length || 0);
+    console.log('User shops found:', userWithShops?.shops?.length || 0);
 
     if (userWithShops && userWithShops.shops.length > 0) {
-      const userShopIds = userWithShops.shops.map((shop) => shop.id);
-      console.log("User shop IDs:", userShopIds);
+      userShopIds = userWithShops.shops.map((shop) => shop.id);
+      console.log('User shop IDs:', userShopIds);
 
-      // Let's check if there are any sells with items from these shops
-      console.log("Checking sells with items from user shops...");
-      const sellsWithShopItems = await prisma.sell.findMany({
+      // Check if there are any SellItems with these shop IDs
+      console.log('Checking SellItems with these shop IDs...');
+      const sellItemsCount = await prisma.sellItem.count({
         where: {
-          saleStatus: { not: 'NOT_APPROVED' },
-          items: {
-            some: {
-              shopId: {
-                in: userShopIds,
+          shopId: {
+            in: userShopIds,
+          },
+        },
+      });
+      console.log("SellItems count with user's shop IDs:", sellItemsCount);
+
+      // Check which sells have items with these shop IDs
+      if (sellItemsCount > 0) {
+        console.log('Checking sells that have items with these shop IDs...');
+        const sellsWithShopItems = await prisma.sell.findMany({
+          where: {
+            saleStatus: { not: 'NOT_APPROVED' },
+            items: {
+              some: {
+                shopId: {
+                  in: userShopIds,
+                },
               },
             },
           },
-        },
-        take: 5,
-        select: {
-          id: true,
-          invoiceNo: true,
-          saleDate: true,
-        },
-      });
-      console.log("Sells with items from user shops:", sellsWithShopItems.length);
-      console.log("Sample:", JSON.stringify(sellsWithShopItems, null, 2));
+          take: 5,
+          select: {
+            id: true,
+            invoiceNo: true,
+            saleDate: true,
+            items: {
+              select: {
+                id: true,
+                shopId: true,
+              },
+            },
+          },
+        });
+        console.log(
+          'Sells with items from user shops:',
+          sellsWithShopItems.length,
+        );
+        console.log('Sample:', JSON.stringify(sellsWithShopItems, null, 2));
+      }
 
       whereClause.items = {
         some: {
@@ -2154,7 +2141,7 @@ const getAllSellsForStore = async ({
         },
       };
     } else {
-      console.log("User has no shops, returning empty results");
+      console.log('User has no shops, returning empty results');
       return {
         sells: [],
         count: 0,
@@ -2162,51 +2149,7 @@ const getAllSellsForStore = async ({
     }
   }
 
-  console.log("Final whereClause before query:", JSON.stringify(whereClause, null, 2));
-
-  // Let's test the date filter separately
-  console.log("\n=== Testing date filter separately ===");
-  const dateFilterTest = await prisma.sell.findMany({
-    where: {
-      saleStatus: { not: 'NOT_APPROVED' },
-      saleDate: whereClause.saleDate,
-    },
-    take: 10,
-    select: {
-      id: true,
-      invoiceNo: true,
-      saleDate: true,
-      saleStatus: true,
-    },
-    orderBy: { saleDate: 'desc' }
-  });
-  console.log("Date filter test results:", dateFilterTest.length);
-  console.log("Sample from date filter:", JSON.stringify(dateFilterTest, null, 2));
-
-  // Let's test the shop filter separately
-  console.log("\n=== Testing shop filter separately ===");
-  const shopFilterTest = await prisma.sell.findMany({
-    where: {
-      saleStatus: { not: 'NOT_APPROVED' },
-      items: {
-        some: {
-          shopId: {
-            in: userShopIds || [],
-          },
-        },
-      },
-    },
-    take: 10,
-    select: {
-      id: true,
-      invoiceNo: true,
-      saleDate: true,
-      saleStatus: true,
-    },
-    orderBy: { saleDate: 'desc' }
-  });
-  console.log("Shop filter test results:", shopFilterTest.length);
-  console.log("Sample from shop filter:", JSON.stringify(shopFilterTest, null, 2));
+  console.log('Final whereClause:', JSON.stringify(whereClause, null, 2));
 
   try {
     const sells = await prisma.sell.findMany({
@@ -2251,63 +2194,58 @@ const getAllSellsForStore = async ({
       },
     });
 
-    console.log("\n=== FINAL RESULTS ===");
-    console.log("Sell count store:", sells.length);
-    
-    // Log the first few sells with their details
+    console.log('\n=== FINAL RESULTS ===');
+    console.log('Sell count store:', sells.length);
+
+    // Log detailed info about found sells
     if (sells.length > 0) {
-      console.log("First 3 sells details:");
-      sells.slice(0, 3).forEach((sell, index) => {
-        console.log(`Sell ${index + 1}:`, {
-          invoiceNo: sell.invoiceNo,
-          saleDate: sell.saleDate,
-          saleStatus: sell.saleStatus,
-          customer: sell.customer?.name,
-          createdBy: sell.createdBy?.name,
-          itemCount: sell.items.length,
-          shops: sell.items.map(item => ({
-            shopId: item.shopId,
-            shopName: item.shop?.name
-          }))
-        });
+      console.log('Found sells details:');
+      sells.forEach((sell, index) => {
+        console.log(`\nSell ${index + 1}:`);
+        console.log(`  Invoice: ${sell.invoiceNo}`);
+        console.log(`  Date: ${sell.saleDate}`);
+        console.log(`  Status: ${sell.saleStatus}`);
+        console.log(`  Customer: ${sell.customer?.name || 'N/A'}`);
+        console.log(`  Created by: ${sell.createdBy?.name || 'N/A'}`);
+        console.log(`  Items count: ${sell.items.length}`);
+        console.log(
+          `  Shops in items: ${sell.items
+            .map((item) => item.shopId)
+            .join(', ')}`,
+        );
       });
-    } else {
-      console.log("No sells found. Let's check why...");
-      
-      // Check if any sells exist at all
-      const anySell = await prisma.sell.findFirst({
-        where: { saleStatus: { not: 'NOT_APPROVED' } },
-        select: { id: true, saleDate: true, invoiceNo: true }
-      });
-      console.log("Any sell found (excluding NOT_APPROVED):", anySell);
     }
 
     // If we're using case-insensitive filtering in memory
     let filteredSells = sells;
-    
+
     // Apply case-insensitive filtering in memory if needed
     if (customerName && customerName.trim()) {
       const customerNameLower = customerName.trim().toLowerCase();
-      filteredSells = filteredSells.filter(sell => 
-        sell.customer && sell.customer.name.toLowerCase().includes(customerNameLower)
+      filteredSells = filteredSells.filter(
+        (sell) =>
+          sell.customer &&
+          sell.customer.name.toLowerCase().includes(customerNameLower),
       );
     }
-    
+
     if (salesPersonName && salesPersonName.trim()) {
       const salesPersonNameLower = salesPersonName.trim().toLowerCase();
-      filteredSells = filteredSells.filter(sell => 
-        sell.createdBy && sell.createdBy.name.toLowerCase().includes(salesPersonNameLower)
+      filteredSells = filteredSells.filter(
+        (sell) =>
+          sell.createdBy &&
+          sell.createdBy.name.toLowerCase().includes(salesPersonNameLower),
       );
     }
-    
-    console.log("Filtered sell count:", filteredSells.length);
+
+    console.log('\nFiltered sell count:', filteredSells.length);
 
     return {
       sells: filteredSells,
       count: filteredSells.length,
     };
   } catch (error) {
-    console.error("Error fetching sells:", error);
+    console.error('Error fetching sells:', error);
     throw error;
   }
 };
