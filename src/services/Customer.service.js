@@ -104,8 +104,11 @@ const updateCustomer = async (id, updateBody) => {
   });
 };
 const getCustomersWithFallback = async (search = '') => {
+  console.log('getCustomersWithFallback called with search:', search);
+  
   // If searching, return search results
   if (search.trim()) {
+    console.log('Performing search for:', search);
     const customers = await prisma.customer.findMany({
       where: {
         OR: [
@@ -119,6 +122,8 @@ const getCustomersWithFallback = async (search = '') => {
       take: 50,
     });
 
+    console.log('Search results count:', customers.length);
+    
     return {
       customers,
       count: customers.length,
@@ -128,6 +133,7 @@ const getCustomersWithFallback = async (search = '') => {
 
   // Try to get top customers by sales
   try {
+    console.log('Attempting to fetch top customers...');
     const topCustomers = await prisma.$queryRaw`
       SELECT c.*
       FROM customers c
@@ -137,23 +143,55 @@ const getCustomersWithFallback = async (search = '') => {
       LIMIT 10
     `;
 
-    if (topCustomers && topCustomers.length > 0) {
+    console.log('Raw topCustomers query result:', topCustomers);
+    console.log('Type of topCustomers:', typeof topCustomers);
+    console.log('Is array?', Array.isArray(topCustomers));
+    
+    if (topCustomers && Array.isArray(topCustomers) && topCustomers.length > 0) {
+      console.log('Top customers found:', topCustomers.length);
+      console.log('First top customer sample:', JSON.stringify(topCustomers[0], null, 2));
+      
+      // IMPORTANT: Raw query returns objects with field names matching DB columns
+      // We need to map them to match the Prisma model field names
+      const mappedCustomers = topCustomers.map(customer => {
+        console.log('Raw customer fields:', Object.keys(customer));
+        return {
+          id: customer._id || customer.id,
+          name: customer.name,
+          companyName: customer.companyName,
+          phone1: customer.phone1,
+          phone2: customer.phone2,
+          tinNumber: customer.tinNumber,
+          address: customer.address,
+          createdAt: customer.createdAt,
+          updatedAt: customer.updatedAt,
+        };
+      });
+
+      console.log('Mapped customers:', mappedCustomers.length);
+
       return {
-        customers: topCustomers,
-        count: topCustomers.length,
+        customers: mappedCustomers,
+        count: mappedCustomers.length,
         isTopCustomers: true,
       };
+    } else {
+      console.log('No top customers found or empty result');
     }
   } catch (error) {
-    console.log('Could not fetch top customers, using default:', error.message);
+    console.log('Error fetching top customers:', error.message);
+    console.log('Error stack:', error.stack);
   }
 
   // Fallback: get first 10 customers alphabetically
+  console.log('Falling back to default customers...');
   const defaultCustomers = await prisma.customer.findMany({
     orderBy: { name: 'asc' },
     take: 10,
   });
 
+  console.log('Default customers count:', defaultCustomers.length);
+  
   return {
     customers: defaultCustomers,
     count: defaultCustomers.length,
