@@ -2168,15 +2168,28 @@ const getAllSellsForStore = async ({
   };
 };
 
-// 2. Separate function to unlock a sell record
 const unlockSell = async (id) => {
+  // First, get the current state
+  const currentSell = await prisma.sell.findUnique({
+    where: { id },
+    select: { locked: true },
+  });
+
+  if (!currentSell) {
+    throw new Error(`Sell with id ${id} not found`);
+  }
+
+  // Toggle the lock state
+  const newLockedState = !currentSell.locked;
+
   const sell = await prisma.sell.update({
     where: { id },
     data: {
-      locked: false,
-      lockedAt: new Date(), // re-lock now
+      locked: newLockedState,
+      lockedAt: newLockedState ? new Date() : null,
     },
   });
+
   return sell;
 };
 module.exports = {
