@@ -2161,7 +2161,7 @@ const getAllSellsForStore = async ({
       },
     },
   });
-
+console.log("sell count store", sells.length)
   return {
     sells,
     count: sells.length,
