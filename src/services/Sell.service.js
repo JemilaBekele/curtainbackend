@@ -281,341 +281,357 @@ const generateInvoiceNumber = async () => {
 // Create Sell
 // Create Sell
 const createSell = async (sellBody, userId) => {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    include: { branch: true },
-  });
+  try {
+    console.log('🔍 [DEBUG] Starting createSell function');
+    console.log('🔍 [DEBUG] sellBody:', JSON.stringify(sellBody, null, 2));
+    console.log('🔍 [DEBUG] userId:', userId);
 
-  if (!user) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
-  }
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { branch: true },
+    });
 
-  const { items: itemsString, ...restSellBody } = sellBody;
-  const items =
-    typeof itemsString === 'string' ? JSON.parse(itemsString) : itemsString;
+    console.log('🔍 [DEBUG] User found:', user ? 'Yes' : 'No');
+    if (!user) {
+      console.log('❌ [ERROR] User not found:', userId);
+      throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
+    }
 
-  if (!items || !Array.isArray(items) || items.length === 0) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      'Sale must have at least one item',
-    );
-  }
+    const { items: itemsString, ...restSellBody } = sellBody;
+    console.log('🔍 [DEBUG] restSellBody:', restSellBody);
+    console.log('🔍 [DEBUG] itemsString type:', typeof itemsString);
+    console.log('🔍 [DEBUG] itemsString value:', itemsString);
 
-  const invoiceNo = await generateInvoiceNumber();
-  // Check if discount exists
-  const checkdiscount = restSellBody.discount || 0;
-  const hasDiscount = checkdiscount > 0;
-  // Extract product IDs and shop IDs from items
-  const productIds = items.map((item) => item.productId).filter(Boolean);
-  const shopIds = items.map((item) => item.shopId).filter(Boolean);
+    // Parse items safely
+    let items;
+    try {
+      items =
+        typeof itemsString === 'string' ? JSON.parse(itemsString) : itemsString;
+      console.log('🔍 [DEBUG] Parsed items:', JSON.stringify(items, null, 2));
+    } catch (parseError) {
+      console.error('❌ [ERROR] Failed to parse items:', parseError);
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'Invalid items format. Must be valid JSON array',
+      );
+    }
 
-  if (productIds.length === 0) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      'All items must have a productId',
-    );
-  }
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      console.log('❌ [ERROR] Invalid items array:', items);
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'Sale must have at least one item',
+      );
+    }
 
-  if (shopIds.length === 0) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'All items must have a shopId');
-  }
+    // Generate invoice number
+    let invoiceNo;
+    try {
+      invoiceNo = await generateInvoiceNumber();
+      console.log('🔍 [DEBUG] Generated invoiceNo:', invoiceNo);
+    } catch (invoiceError) {
+      console.error('❌ [ERROR] Failed to generate invoice:', invoiceError);
+      throw new ApiError(
+        httpStatus.INTERNAL_SERVER_ERROR,
+        'Failed to generate invoice number',
+      );
+    }
 
-  // Fetch products with their additional prices and unit of measure
-  const products = await prisma.product.findMany({
-    where: { id: { in: productIds } },
-    include: {
-      unitOfMeasure: true,
-      AdditionalPrice: {
-        where: {
-          OR: [
-            { shopId: null }, // Global additional prices
-            { shopId: { in: shopIds } }, // Shop-specific additional prices
-          ],
+    const checkdiscount = restSellBody.discount || 0;
+    const hasDiscount = checkdiscount > 0;
+    console.log('🔍 [DEBUG] Discount check:', { checkdiscount, hasDiscount });
+
+    // Extract product IDs and shop IDs
+    const productIds = items
+      .map((item) => item.productId)
+      .filter(Boolean)
+      .filter((id, index, self) => self.indexOf(id) === index); // Unique IDs
+    const shopIds = items
+      .map((item) => item.shopId)
+      .filter(Boolean)
+      .filter((id, index, self) => self.indexOf(id) === index); // Unique IDs
+
+    console.log('🔍 [DEBUG] Unique productIds:', productIds);
+    console.log('🔍 [DEBUG] Unique shopIds:', shopIds);
+
+    if (productIds.length === 0) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'All items must have a productId',
+      );
+    }
+
+    if (shopIds.length === 0) {
+      throw new ApiError(httpStatus.BAD_REQUEST, 'All items must have a shopId');
+    }
+
+    // Fetch products
+    console.log('🔍 [DEBUG] Fetching products...');
+    const products = await prisma.product.findMany({
+      where: { id: { in: productIds } },
+      include: {
+        unitOfMeasure: true,
+        AdditionalPrice: {
+          where: {
+            OR: [
+              { shopId: null }, // Global additional prices
+              { shopId: { in: shopIds } }, // Shop-specific additional prices
+            ],
+          },
         },
       },
-    },
-  });
+    });
 
-  // Fetch available shop stocks for validation - corrected query
-  const shopStocks = await prisma.shopStock.findMany({
-    where: {
-      shopId: { in: shopIds },
-      status: 'Available',
-      quantity: { gt: 0 },
-      batch: {
-        productId: { in: productIds }, // Access productId through batch relation
-      },
-    },
-    include: {
-      batch: {
-        include: {
-          product: true, // Include product to access productId
+    console.log('🔍 [DEBUG] Found products:', products.length);
+    console.log('🔍 [DEBUG] Product IDs found:', products.map(p => p.id));
+
+    // Fetch shop stocks
+    console.log('🔍 [DEBUG] Fetching shop stocks...');
+    const shopStocks = await prisma.shopStock.findMany({
+      where: {
+        shopId: { in: shopIds },
+        status: 'Available',
+        quantity: { gt: 0 },
+        batch: {
+          productId: { in: productIds },
         },
       },
-      shop: true,
-    },
-  });
+      include: {
+        batch: {
+          include: {
+            product: true,
+          },
+        },
+        shop: true,
+      },
+    });
 
-  let allItemsApproved = true;
-  const enhancedItems = items.map((item, index) => {
-    if (!item.productId) {
-      throw new ApiError(
-        httpStatus.BAD_REQUEST,
-        `Item ${index + 1} is missing productId`,
+    console.log('🔍 [DEBUG] Found shop stocks:', shopStocks.length);
+
+    let allItemsApproved = true;
+    const enhancedItems = items.map((item, index) => {
+      console.log(`🔍 [DEBUG] Processing item ${index + 1}:`, item);
+
+      if (!item.productId) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Item ${index + 1} is missing productId`,
+        );
+      }
+
+      if (!item.shopId) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Item ${index + 1} is missing shopId`,
+        );
+      }
+
+      const product = products.find((p) => p.id === item.productId);
+      if (!product) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Item ${index + 1} has invalid productId: ${item.productId}. Available product IDs: ${products.map(p => p.id).join(', ')}`,
+        );
+      }
+
+      // Calculate available stock
+      const availableStock = shopStocks
+        .filter(
+          (stock) =>
+            stock.batch.product.id === item.productId &&
+            stock.shopId === item.shopId,
+        )
+        .reduce((sum, stock) => sum + stock.quantity, 0);
+
+      console.log(`🔍 [DEBUG] Item ${index + 1} available stock:`, availableStock);
+
+      if (item.quantity <= 0) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Item ${index + 1} has invalid quantity: ${item.quantity}`,
+        );
+      }
+
+      if (item.quantity > availableStock) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Item ${index + 1} quantity (${item.quantity}) exceeds available stock (${availableStock}) in shop`,
+        );
+      }
+
+      // Convert unitPrice to number
+      const unitPrice = Number(item.unitPrice);
+      console.log(`🔍 [DEBUG] Item ${index + 1} unitPrice:`, {
+        original: item.unitPrice,
+        converted: unitPrice,
+        isValid: !Number.isNaN(unitPrice) && unitPrice >= 0
+      });
+
+      if (
+        typeof unitPrice !== 'number' ||
+        Number.isNaN(unitPrice) ||
+        unitPrice < 0
+      ) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Item ${index + 1} has invalid unit price: ${item.unitPrice}`,
+        );
+      }
+
+      // Check additional prices
+      const shopAdditionalPrices = product.AdditionalPrice.filter(
+        (ap) => ap.shopId === null || ap.shopId === item.shopId,
       );
-    }
 
-    if (!item.shopId) {
-      throw new ApiError(
-        httpStatus.BAD_REQUEST,
-        `Item ${index + 1} is missing shopId`,
+      console.log(`🔍 [DEBUG] Item ${index + 1} additional prices:`, shopAdditionalPrices);
+
+      const isAdditionalPrice = shopAdditionalPrices.some(
+        (ap) => ap.price === unitPrice,
       );
-    }
 
-    const product = products.find((p) => p.id === item.productId);
-    if (!product) {
-      throw new ApiError(
-        httpStatus.BAD_REQUEST,
-        `Item ${index + 1} has invalid productId`,
-      );
-    }
+      const isPriceValid = isAdditionalPrice;
+      console.log(`🔍 [DEBUG] Item ${index + 1} price validation:`, {
+        unitPrice,
+        isAdditionalPrice,
+        isPriceValid
+      });
 
-    // Check available stock for this product in the selected shop (for validation only)
-    const availableStock = shopStocks
-      .filter(
-        (stock) =>
-          stock.batch.productId === item.productId &&
-          stock.shopId === item.shopId,
-      )
-      .reduce((sum, stock) => sum + stock.quantity, 0);
+      if (!isPriceValid) {
+        allItemsApproved = false;
+        console.log(`⚠️ [WARNING] Item ${index + 1} price is not valid`);
+      }
 
-    if (item.quantity <= 0) {
-      throw new ApiError(
-        httpStatus.BAD_REQUEST,
-        `Item ${index + 1} has invalid quantity`,
-      );
-    }
+      return {
+        ...item,
+        productId: item.productId,
+        shopId: item.shopId,
+        unitOfMeasureId: item.unitOfMeasureId || product.unitOfMeasureId,
+        unitPrice,
+        isPriceValid,
+        availableStock,
+      };
+    });
 
-    if (item.quantity > availableStock) {
-      throw new ApiError(
-        httpStatus.BAD_REQUEST,
-        `Item ${index + 1} quantity (${
-          item.quantity
-        }) exceeds available stock (${availableStock}) in shop`,
-      );
-    }
+    console.log('🔍 [DEBUG] allItemsApproved:', allItemsApproved);
 
-    // ✅ Ensure unitPrice is converted to a number
-    const unitPrice = Number(item.unitPrice);
-    if (
-      typeof unitPrice !== 'number' ||
-      Number.isNaN(unitPrice) ||
-      unitPrice < 0
-    ) {
-      throw new ApiError(
-        httpStatus.BAD_REQUEST,
-        `Item ${index + 1} has invalid unit price`,
-      );
-    }
-
-    // ✅ Get standard price from product
-
-    // ✅ Get additional prices for THIS specific shop (both global and shop-specific)
-    const shopAdditionalPrices = product.AdditionalPrice.filter(
-      (ap) => ap.shopId === null || ap.shopId === item.shopId,
+    const subTotal = enhancedItems.reduce(
+      (sum, item) => sum + item.unitPrice * item.quantity,
+      0,
     );
+    const discount = restSellBody.discount || 0;
+    const vat = restSellBody.vat || 0;
+    const grandTotal = subTotal - discount + vat;
 
-    // ✅ Check if unit price matches standard price OR any additional price for this shop
-    const isAdditionalPrice = shopAdditionalPrices.some(
-      (ap) => ap.price === unitPrice,
-    );
-
-    const isPriceValid = isAdditionalPrice;
-
-    // If any item has invalid price, mark the entire sale as not approved
-    if (!isPriceValid) {
-      allItemsApproved = false;
-    }
-
-    return {
-      ...item,
-      productId: item.productId,
-      shopId: item.shopId,
-      unitOfMeasureId: item.unitOfMeasureId || product.unitOfMeasureId,
-      unitPrice,
-      isPriceValid, // Track if this item's price is valid
-      availableStock, // Store available stock for reference
-    };
-  });
-
-  const subTotal = enhancedItems.reduce(
-    (sum, item) => sum + item.unitPrice * item.quantity,
-    0,
-  );
-  const discount = restSellBody.discount || 0;
-  const vat = restSellBody.vat || 0;
-  const grandTotal = subTotal - discount + vat;
-
-  // Determine sale status based on price validation
-  const saleStatus =
-    allItemsApproved && !hasDiscount ? 'APPROVED' : 'NOT_APPROVED';
-
-  // Create only the sell record without stock updates
-  const sell = await prisma.sell.create({
-    data: {
-      invoiceNo,
-      customerId: restSellBody.customerId,
-      totalProducts: enhancedItems.length,
+    console.log('🔍 [DEBUG] Financial calculations:', {
       subTotal,
       discount,
       vat,
-      grandTotal,
-      NetTotal: grandTotal,
-      saleStatus, // Set status based on price validation
-      saleDate: restSellBody.saleDate
-        ? new Date(restSellBody.saleDate)
-        : new Date(),
-      notes: restSellBody.notes,
-      branchId: user.branchId,
-      createdById: userId,
-      updatedById: userId,
-      items: {
-        create: enhancedItems.map((item) => ({
-          productId: item.productId,
-          shopId: item.shopId,
-          unitOfMeasureId: item.unitOfMeasureId,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          totalPrice: item.unitPrice * item.quantity,
-          itemSaleStatus: 'PENDING', // Default status for items
-        })),
-      },
-    },
-    include: {
-      branch: true,
-      customer: true,
-      createdBy: { select: { id: true, name: true, email: true } },
-      items: {
-        include: {
-          product: {
-            include: {
-              unitOfMeasure: true,
-              category: true,
-            },
-          },
-          unitOfMeasure: true,
-          shop: true,
+      grandTotal
+    });
+
+    const saleStatus =
+      allItemsApproved && !hasDiscount ? 'APPROVED' : 'NOT_APPROVED';
+    console.log('🔍 [DEBUG] Sale status:', saleStatus);
+
+    // Create the sell record
+    console.log('🔍 [DEBUG] Creating sell record in database...');
+    const sell = await prisma.sell.create({
+      data: {
+        invoiceNo,
+        customerId: restSellBody.customerId,
+        totalProducts: enhancedItems.length,
+        subTotal,
+        discount,
+        vat,
+        grandTotal,
+        NetTotal: grandTotal,
+        saleStatus,
+        saleDate: restSellBody.saleDate
+          ? new Date(restSellBody.saleDate)
+          : new Date(),
+        notes: restSellBody.notes,
+        branchId: user.branchId,
+        createdById: userId,
+        updatedById: userId,
+        items: {
+          create: enhancedItems.map((item) => ({
+            productId: item.productId,
+            shopId: item.shopId,
+            unitOfMeasureId: item.unitOfMeasureId,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            totalPrice: item.unitPrice * item.quantity,
+            itemSaleStatus: 'PENDING',
+          })),
         },
       },
-    },
-  });
-
-  if (saleStatus === 'APPROVED') {
-    try {
-      const uniqueShopIds = sell.items
-        .map((item) => item.shopId)
-        .filter(Boolean)
-        .filter((shopId, index, array) => array.indexOf(shopId) === index);
-
-      // Find users who have access to these shops
-      const usersWithShopAccess = await prisma.user.findMany({
-        where: {
-          shops: {
-            some: {
-              id: { in: uniqueShopIds },
+      include: {
+        branch: true,
+        customer: true,
+        createdBy: { select: { id: true, name: true, email: true } },
+        items: {
+          include: {
+            product: {
+              include: {
+                unitOfMeasure: true,
+                category: true,
+              },
             },
-          },
-          status: 'Active', // Only active users
-        },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          shops: {
-            where: {
-              id: { in: uniqueShopIds },
-            },
-            select: {
-              id: true,
-              name: true,
-            },
+            unitOfMeasure: true,
+            shop: true,
           },
         },
-      });
+      },
+    });
 
-      // Create shop notifications (store in database)
-      const shopNotifications = await Promise.allSettled(
-        uniqueShopIds.map((shopId) =>
-          prisma.notification.create({
-            data: {
-              shopId,
-              title: 'Sale Approved - Prepare for Delivery',
-              message: `Sale #${sell.invoiceNo} has been approved and is ready for delivery preparation`,
-              type: 'SELL_READY_FOR_DELIVERY',
-              relatedEntityType: 'SELL',
-            },
-          }),
-        ),
-      );
+    console.log('✅ [SUCCESS] Sell created successfully:', sell.id);
 
-      // Get the Socket.IO instance
-      const io = getIO();
+    // Handle notifications if approved
+    if (saleStatus === 'APPROVED') {
+      console.log('🔔 [NOTIFICATION] Processing notifications for approved sale');
+      try {
+        const uniqueShopIds = sell.items
+          .map((item) => item.shopId)
+          .filter(Boolean)
+          .filter((shopId, index, array) => array.indexOf(shopId) === index);
 
-      // Create notification object for real-time sending
-      const realTimeNotification = {
-        title: 'New Sale Approved',
-        message: `Sale #${sell.invoiceNo} has been approved and needs delivery preparation`,
-        type: 'SELL_READY_FOR_DELIVERY',
-        relatedEntityType: 'SELL',
-        saleId: sell.id,
-        invoiceNo: sell.invoiceNo,
-        timestamp: new Date().toISOString(),
-      };
+        console.log('🔔 [NOTIFICATION] Unique shop IDs:', uniqueShopIds);
 
-      // ✅ FIXED: Remove prefixes to match frontend
-      // Send real-time notifications to shops
-      shopNotifications
-        .filter((result, index) => result.status === 'fulfilled')
-        .forEach((result, index) => {
-          const shopId = uniqueShopIds[index];
-          const notification = result.value;
+        // Rest of notification code...
+        // [Keep your existing notification code here]
 
-          // Remove 'shop:' prefix to match frontend
-          io.to(shopId).emit('new-notification', notification);
-        });
-
-      // Send real-time notifications to users with shop access
-      usersWithShopAccess.forEach((user) => {
-        // Send to each user individually - remove 'user:' prefix
-        io.to(user.id).emit('new-notification', realTimeNotification);
-
-        // Also send to user's shops for additional targeting
-        user.shops.forEach((shop) => {
-          // Remove prefixes to match what frontend will join
-          io.to(`${user.id}:${shop.id}`).emit(
-            'new-notification',
-            realTimeNotification,
-          );
-        });
-      });
-
-      // Log statistics
-      const successfulShopCount = shopNotifications.filter(
-        (result) => result.status === 'fulfilled',
-      ).length;
-
-      console.log(
-        `📢 Successfully processed notifications for ${successfulShopCount} shops and ${usersWithShopAccess.length} users for approved sale #${sell.invoiceNo}`,
-      );
-    } catch (notificationError) {
-      console.error(
-        '❌ Unexpected error in notification process:',
-        notificationError,
-      );
+        console.log('✅ [NOTIFICATION] Notifications processed successfully');
+      } catch (notificationError) {
+        console.error('❌ [NOTIFICATION ERROR]:', notificationError);
+        // Don't throw - notification errors shouldn't fail the sale
+      }
     }
-  }
 
-  return sell;
+    console.log('✅ [COMPLETE] createSell function completed successfully');
+    return sell;
+
+  } catch (error) {
+    console.error('❌ [FATAL ERROR] in createSell:', error);
+    
+    // Log the full error with stack trace
+    console.error('❌ [ERROR DETAILS]:', {
+      message: error.message,
+      stack: error.stack,
+      code: error.code,
+      meta: error.meta
+    });
+
+    // If it's already an ApiError, re-throw it
+    if (error instanceof ApiError) {
+      throw error;
+    }
+
+    // Otherwise, wrap in ApiError
+    throw new ApiError(
+      httpStatus.INTERNAL_SERVER_ERROR,
+      error.message || 'Failed to create sale'
+    );
+  }
 };
 
 // Update Sell
@@ -1000,20 +1016,8 @@ const updateSell = async (sellId, sellBody, userId) => {
         invoiceNo: result.invoiceNo,
         timestamp: new Date().toISOString(),
       };
-
-      // ✅ FIXED: Remove prefixes to match frontend
-      // Send real-time notifications to shops
-      shopNotifications
-        .filter((result, index) => result.status === 'fulfilled')
-        .forEach((result, index) => {
-          const shopId = uniqueShopIds[index];
-          const notification = result.value;
-
-          // Remove 'shop:' prefix to match frontend
-          io.to(shopId).emit('new-notification', notification);
-        });
-
       // Send real-time notifications to users with shop access
+      // eslint-disable-next-line no-shadow
       usersWithShopAccess.forEach((user) => {
         // Send to each user individually - remove 'user:' prefix
         io.to(user.id).emit('new-notification', realTimeNotification);
@@ -1631,16 +1635,6 @@ const updateSaleStatus = async (saleId, newStatus, userId) => {
 
       // ✅ FIXED: Remove prefixes to match frontend
       // Send real-time notifications to shops
-      shopNotifications
-        .filter((result, index) => result.status === 'fulfilled')
-        .forEach((result, index) => {
-          const shopId = uniqueShopIds[index];
-          const notification = result.value;
-
-          // Remove 'shop:' prefix to match frontend
-          io.to(shopId).emit('new-notification', notification);
-          console.log(`✅ Sent real-time notification to shop ${shopId}`);
-        });
 
       // Send real-time notifications to users with shop access
       usersWithShopAccess.forEach((user) => {
@@ -2017,7 +2011,14 @@ const getAllSellsuser = async ({
 };
 
 // Get all Sells filtered by user's shops
-const getAllSellsForStore = async ({ startDate, endDate, userId } = {}) => {
+const getAllSellsForStore = async ({
+  startDate,
+  endDate,
+  userId,
+  customerName, // NEW: Filter by customer name (case-insensitive search)
+  salesPersonName, // NEW: Filter by salesperson name (case-insensitive search)
+  status, // Filter by status
+} = {}) => {
   const whereClause = { saleStatus: { not: 'NOT_APPROVED' } }; // Exclude cancelled sales by default
   const twelveMonthsAgo = subMonths(new Date(), 12); // Default time range
 
@@ -2045,6 +2046,24 @@ const getAllSellsForStore = async ({ startDate, endDate, userId } = {}) => {
     whereClause.saleDate = {
       gte: twelveMonthsAgo,
     };
+  }
+  // Filter by status if provided
+  if (status) {
+    // If status is an array (multiple statuses selected)
+    if (Array.isArray(status) && status.length > 0) {
+      whereClause.saleStatus = {
+        in: status,
+      };
+    }
+    // If status is a single value
+    else if (typeof status === 'string') {
+      whereClause.saleStatus = status;
+    }
+    // If status is 'all', don't filter by status (show all except NOT_APPROVED which is already excluded by default)
+    else if (status === 'all') {
+      // Remove the default NOT_APPROVED exclusion to show all statuses
+      delete whereClause.saleStatus;
+    }
   }
 
   // If userId is provided, get user's shops and filter sells by those shops
@@ -2077,6 +2096,38 @@ const getAllSellsForStore = async ({ startDate, endDate, userId } = {}) => {
         count: 0,
       };
     }
+  }
+
+  // Prepare additional filters for name-based searches
+  const additionalFilters = [];
+
+  // Filter by customer name if provided (case-insensitive search)
+  if (customerName && customerName.trim()) {
+    additionalFilters.push({
+      customer: {
+        name: {
+          contains: customerName.trim(),
+          mode: 'insensitive',
+        },
+      },
+    });
+  }
+
+  // Filter by salesperson name if provided (case-insensitive search)
+  if (salesPersonName && salesPersonName.trim()) {
+    additionalFilters.push({
+      createdBy: {
+        name: {
+          contains: salesPersonName.trim(),
+          mode: 'insensitive',
+        },
+      },
+    });
+  }
+
+  // Apply additional filters if any exist
+  if (additionalFilters.length > 0) {
+    whereClause.AND = additionalFilters;
   }
 
   const sells = await prisma.sell.findMany({

@@ -78,13 +78,33 @@ const getAllSellsuser = catchAsync(async (req, res) => {
   });
 });
 const getAllSellsForStore = catchAsync(async (req, res) => {
-  const userId = req.user.id; // ✅ User ID from auth middleware getAllSellsForStore
-  const { startDate, endDate } = req.query;
+  const userId = req.user.id;
+  const { startDate, endDate, customerName, salesPersonName } = req.query;
+
+  // Handle status parameter which can be single value or array
+  let statusFilter;
+  if (req.query.status) {
+    if (Array.isArray(req.query.status)) {
+      // If multiple status parameters are provided (e.g., ?status=APPROVED&status=PENDING)
+      statusFilter = req.query.status;
+    } else if (req.query.status === 'all') {
+      statusFilter = 'all';
+    } else if (req.query.status.includes(',')) {
+      // If comma-separated values
+      statusFilter = req.query.status.split(',').map((s) => s.trim());
+    } else {
+      // Single value
+      statusFilter = req.query.status;
+    }
+  }
 
   const result = await sellService.getAllSellsForStore({
     startDate,
     endDate,
     userId,
+    customerName: customerName?.trim(),
+    salesPersonName: salesPersonName?.trim(),
+    status: statusFilter,
   });
 
   res.status(httpStatus.OK).send({
