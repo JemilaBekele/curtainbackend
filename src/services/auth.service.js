@@ -90,8 +90,8 @@ const login = async (email, password, ipAddr) => {
     status: user.status,
     phone: user.phone,
     // Include branch information if exists
-    // branch: user.branch.name,
-    // branchId: user.branchId,
+    branch: user?.branch?.name,
+    branchId: user?.branchId,
     // Include assigned shops and stores
     shops: user.shops,
     stores: user.stores,
