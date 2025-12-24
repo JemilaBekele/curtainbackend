@@ -252,51 +252,39 @@ const generateInvoiceNumber = async () => {
   try {
     console.log('🔢 [INVOICE] Generating invoice number...');
 
-    // Check if we should reset to start from 00001
-    const RESET_TO_START = false; // Set to true if you want to restart numbering
-    
-    if (RESET_TO_START) {
-      // Manually start from 00001 (overrides existing numbers)
-      const invoiceCount = await prisma.sell.count();
-      const nextNumber = invoiceCount + 1;
-      const invoiceNumber = `INV-${nextNumber.toString().padStart(5, '0')}`;
-      console.log('✅ [INVOICE] Reset mode - Generated:', invoiceNumber);
+    // Get all invoice numbers
+    const allSells = await prisma.sell.findMany({
+      select: { invoiceNo: true },
+    });
+
+    let maxNumber = 0;
+
+    if (allSells.length === 0) {
+      // No invoices exist, start from 00001
+      const invoiceNumber = 'INV-00001';
+      console.log('✅ [INVOICE] First invoice:', invoiceNumber);
       return invoiceNumber;
     }
 
-    // Normal mode: continue from existing highest number
-    // Get the highest invoice number that matches our pattern
-    const latestSell = await prisma.sell.findFirst({
-      where: {
-        invoiceNo: {
-          startsWith: 'INV-',
-        },
-      },
-      orderBy: {
-        // Sort by the numeric part of the invoice number
-        invoiceNo: 'desc',
-      },
-    });
-
-    let nextNumber = 1; // Default starting number
-
-    if (latestSell) {
-      console.log('🔢 [INVOICE] Latest invoice found:', latestSell.invoiceNo);
-      
-      // Extract the numeric part (after "INV-")
-      const parts = latestSell.invoiceNo.split('-');
-      if (parts.length > 1) {
-        const lastNumber = parseInt(parts[1], 10);
-        if (!isNaN(lastNumber)) {
-          nextNumber = lastNumber + 1;
-          console.log('🔢 [INVOICE] Continuing from:', lastNumber, 'Next:', nextNumber);
-        } else {
-          console.log('⚠️ [INVOICE] Could not parse number from:', latestSell.invoiceNo);
+    // Find the maximum numeric invoice number
+    for (const sell of allSells) {
+      // Extract numeric part from any format
+      const match = sell.invoiceNo.match(/INV-?(\d+)/i);
+      if (match && match[1]) {
+        const numericPart = parseInt(match[1], 10);
+        if (!isNaN(numericPart) && numericPart > maxNumber) {
+          maxNumber = numericPart;
         }
       }
-    } else {
-      console.log('🔢 [INVOICE] No existing invoices found, starting from 00001');
     }
+
+    const nextNumber = maxNumber === 0 ? 1 : maxNumber + 1;
+    console.log(
+      '🔢 [INVOICE] Max number found:',
+      maxNumber,
+      'Next:',
+      nextNumber,
+    );
 
     // Format: Always 5 digits
     const invoiceNumber = `INV-${nextNumber.toString().padStart(5, '0')}`;
@@ -305,10 +293,7 @@ const generateInvoiceNumber = async () => {
     return invoiceNumber;
   } catch (error) {
     console.error('❌ [INVOICE ERROR]:', error);
-    // Emergency fallback
-    const fallbackNumber = `INV-${Date.now().toString().slice(-5)}`;
-    console.log('⚠️ [INVOICE] Using fallback:', fallbackNumber);
-    return fallbackNumber;
+    return `INV-${Date.now().toString().slice(-8)}`;
   }
 };
 // Create Sell
