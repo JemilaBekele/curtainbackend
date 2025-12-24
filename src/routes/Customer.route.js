@@ -27,8 +27,14 @@ router.get(
 router.get(
   '/api/customers',
   auth,
-  //   checkPermission('VIEW_CUSTOMER'),
+  //   checkPermission('VIEW_CUSTOMER'), getCustomersWithFallback
   customerSupplierController.getCustomers,
+);
+router.get(
+  '/api/customers/WithFallback',
+  auth,
+  //   checkPermission('VIEW_CUSTOMER'),
+  customerSupplierController.getCustomersWithFallback,
 );
 
 // Update a customer

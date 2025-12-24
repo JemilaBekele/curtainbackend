@@ -32,6 +32,18 @@ const getCustomers = catchAsync(async (req, res) => {
     ...result,
   });
 });
+const getCustomersWithFallback = catchAsync(async (req, res) => {
+  const { search = '' } = req.query;
+
+  const result = await customerService.getCustomersWithFallback(
+    typeof search === 'string' ? search : '',
+  );
+
+  res.status(httpStatus.OK).send({
+    success: true,
+    ...result,
+  });
+});
 
 const updateCustomer = catchAsync(async (req, res) => {
   const customer = await customerService.updateCustomer(
@@ -110,7 +122,7 @@ module.exports = {
   getCustomers,
   updateCustomer,
   deleteCustomer,
-
+  getCustomersWithFallback,
   // Supplier exports
   createSupplier,
   getSupplier,

@@ -103,7 +103,63 @@ const updateCustomer = async (id, updateBody) => {
     data: updateBody,
   });
 };
+const getCustomersWithFallback = async (search = '') => {
+  // If searching, return search results
+  if (search.trim()) {
+    const customers = await prisma.customer.findMany({
+      where: {
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { companyName: { contains: search, mode: 'insensitive' } },
+          { phone1: { contains: search } },
+          { phone2: { contains: search } },
+        ],
+      },
+      orderBy: { name: 'asc' },
+      take: 50,
+    });
 
+    return {
+      customers,
+      count: customers.length,
+      isSearchResults: true,
+    };
+  }
+
+  // Try to get top customers by sales
+  try {
+    const topCustomers = await prisma.$queryRaw`
+      SELECT c.*
+      FROM customers c
+      LEFT JOIN sells s ON c._id = s.customerId
+      GROUP BY c._id
+      ORDER BY COALESCE(SUM(s.grandTotal), 0) DESC
+      LIMIT 10
+    `;
+
+    if (topCustomers && topCustomers.length > 0) {
+      return {
+        customers: topCustomers,
+        count: topCustomers.length,
+        isTopCustomers: true,
+      };
+    }
+  } catch (error) {
+    console.log('Could not fetch top customers, using default:', error.message);
+  }
+
+  // Fallback: get first 10 customers alphabetically
+  const defaultCustomers = await prisma.customer.findMany({
+    orderBy: { name: 'asc' },
+    take: 10,
+  });
+
+  return {
+    customers: defaultCustomers,
+    count: defaultCustomers.length,
+    isDefaultCustomers: true,
+  };
+};
 const deleteCustomer = async (id) => {
   const existingCustomer = await getCustomerById(id);
   if (!existingCustomer) {
@@ -250,6 +306,7 @@ const deleteSupplier = async (id) => {
 
 module.exports = {
   // Customer exports
+  getCustomersWithFallback,
   getCustomerById,
   getCustomerByEmail,
   getCustomerByPhone,
