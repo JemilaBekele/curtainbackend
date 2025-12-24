@@ -34,41 +34,53 @@ const getCustomers = catchAsync(async (req, res) => {
 });
 const getCustomersWithFallback = catchAsync(async (req, res) => {
   console.log('🎯 getCustomersWithFallback controller called');
-  console.log('📝 Request query:', req.query);
+  console.log('📝 Request query:', JSON.stringify(req.query, null, 2));
   console.log('🔍 Search parameter:', req.query.search);
-  console.log('🌐 Request URL:', req.originalUrl);
+  console.log('🌐 Full URL:', req.protocol + '://' + req.get('host') + req.originalUrl);
   console.log('📊 Request method:', req.method);
-  console.log('🔑 Request headers:', req.headers);
+  console.log('📍 Request path:', req.path);
+  console.log('🔑 Request headers:', JSON.stringify(req.headers, null, 2));
   
   const { search = '' } = req.query;
   const searchString = typeof search === 'string' ? search : '';
 
   console.log('📋 Processed search string:', searchString);
+  console.log('🔧 Calling customerService.getCustomersWithFallback with:', searchString);
 
   try {
-    console.log('📞 Calling customerService.getCustomersWithFallback...');
+    console.time('⏱️ Service call duration');
     const result = await customerService.getCustomersWithFallback(searchString);
+    console.timeEnd('⏱️ Service call duration');
     
-    console.log('✅ Service returned:', {
+    console.log('✅ Service returned successfully');
+    console.log('📊 Result stats:', {
       success: result.success,
       count: result.count || 0,
-      isSearchResults: result.isSearchResults,
-      isTopCustomers: result.isTopCustomers,
-      isDefaultCustomers: result.isDefaultCustomers
+      isSearchResults: result.isSearchResults || false,
+      isTopCustomers: result.isTopCustomers || false,
+      isDefaultCustomers: result.isDefaultCustomers || false,
+      firstCustomer: result.customers?.[0] || 'No customers'
     });
 
     res.status(httpStatus.OK).send({
       success: true,
       ...result,
     });
+    
+    console.log('📤 Response sent successfully');
   } catch (serviceError) {
     console.error('❌ Error in customer service:', serviceError.message);
-    console.error('Service error stack:', serviceError.stack);
+    console.error('📝 Service error details:', {
+      name: serviceError.name,
+      message: serviceError.message,
+      stack: serviceError.stack
+    });
     
     res.status(httpStatus.INTERNAL_SERVER_ERROR).send({
       success: false,
       error: 'Failed to fetch customers',
-      message: serviceError.message
+      message: serviceError.message,
+      details: process.env.NODE_ENV === 'development' ? serviceError.stack : undefined
     });
   }
 });

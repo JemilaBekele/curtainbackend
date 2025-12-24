@@ -31,7 +31,7 @@ router.get(
   customerSupplierController.getCustomers,
 );
 router.get(
-  '/api/customers/WithFallback',
+  '/api/With/fall/back/customers',
   auth,
   //   checkPermission('VIEW_CUSTOMER'),
   customerSupplierController.getCustomersWithFallback,
