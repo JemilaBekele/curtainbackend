@@ -2005,16 +2005,28 @@ const getAllSellsForStore = async ({
   startDate,
   endDate,
   userId,
-  customerName, // NEW: Filter by customer name (case-insensitive search)
-  salesPersonName, // NEW: Filter by salesperson name (case-insensitive search)
-  status, // Filter by status
+  customerName,
+  salesPersonName,
+  status,
 } = {}) => {
-  const whereClause = { saleStatus: { not: 'NOT_APPROVED' } }; // Exclude cancelled sales by default
-  const twelveMonthsAgo = subMonths(new Date(), 12); // Default time range
+  console.log("Function called with params:", {
+    startDate,
+    endDate,
+    userId,
+    customerName,
+    salesPersonName,
+    status,
+  });
+
+  const whereClause = { saleStatus: { not: 'NOT_APPROVED' } };
+  const twelveMonthsAgo = subMonths(new Date(), 12);
 
   // Convert string dates to Date objects if they exist
   const startDateObj = startDate ? new Date(startDate) : undefined;
   const endDateObj = endDate ? new Date(endDate) : undefined;
+
+  console.log("Start date object:", startDateObj);
+  console.log("End date object:", endDateObj);
 
   // Build the date filter
   if (startDateObj && endDateObj) {
@@ -2037,28 +2049,29 @@ const getAllSellsForStore = async ({
       gte: twelveMonthsAgo,
     };
   }
+
+  console.log("Date filter applied:", whereClause.saleDate);
+
   // Filter by status if provided
   if (status) {
-    // If status is an array (multiple statuses selected)
+    console.log("Status filter provided:", status);
+    
     if (Array.isArray(status) && status.length > 0) {
       whereClause.saleStatus = {
         in: status,
       };
-    }
-    // If status is a single value
-    else if (typeof status === 'string') {
+    } else if (typeof status === 'string') {
       whereClause.saleStatus = status;
-    }
-    // If status is 'all', don't filter by status (show all except NOT_APPROVED which is already excluded by default)
-    else if (status === 'all') {
-      // Remove the default NOT_APPROVED exclusion to show all statuses
+    } else if (status === 'all') {
       delete whereClause.saleStatus;
     }
+    console.log("Status filter after processing:", whereClause.saleStatus);
   }
 
   // If userId is provided, get user's shops and filter sells by those shops
   if (userId) {
-    // First, get the user with their associated shops
+    console.log("User ID provided:", userId);
+    
     const userWithShops = await prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -2068,9 +2081,11 @@ const getAllSellsForStore = async ({
       },
     });
 
-    // If user has shops, add shop filter to whereClause
+    console.log("User shops found:", userWithShops?.shops?.length || 0);
+
     if (userWithShops && userWithShops.shops.length > 0) {
       const userShopIds = userWithShops.shops.map((shop) => shop.id);
+      console.log("User shop IDs:", userShopIds);
 
       whereClause.items = {
         some: {
@@ -2080,7 +2095,7 @@ const getAllSellsForStore = async ({
         },
       };
     } else {
-      // If user has no shops, return empty results
+      console.log("User has no shops, returning empty results");
       return {
         sells: [],
         count: 0,
@@ -2093,6 +2108,7 @@ const getAllSellsForStore = async ({
 
   // Filter by customer name if provided (case-insensitive search)
   if (customerName && customerName.trim()) {
+    console.log("Customer name filter:", customerName.trim());
     additionalFilters.push({
       customer: {
         name: {
@@ -2105,6 +2121,7 @@ const getAllSellsForStore = async ({
 
   // Filter by salesperson name if provided (case-insensitive search)
   if (salesPersonName && salesPersonName.trim()) {
+    console.log("Salesperson name filter:", salesPersonName.trim());
     additionalFilters.push({
       createdBy: {
         name: {
@@ -2115,57 +2132,88 @@ const getAllSellsForStore = async ({
     });
   }
 
+  console.log("Additional filters count:", additionalFilters.length);
+  console.log("Additional filters:", JSON.stringify(additionalFilters, null, 2));
+
   // Apply additional filters if any exist
   if (additionalFilters.length > 0) {
-    whereClause.AND = additionalFilters;
+    // If we already have an AND clause, we need to merge
+    if (whereClause.AND) {
+      whereClause.AND = [...whereClause.AND, ...additionalFilters];
+    } else {
+      // IMPORTANT: We need to include the existing conditions with AND
+      // The issue might be here - we're overwriting existing conditions
+      // Instead, let's create a proper structure
+      const baseConditions = { ...whereClause };
+      // Remove AND if it exists to avoid duplication
+      delete baseConditions.AND;
+      
+      // Create a new AND array with all conditions
+      whereClause.AND = [baseConditions, ...additionalFilters];
+      
+      // Clear the individual conditions since they're now in AND
+      Object.keys(baseConditions).forEach(key => {
+        delete whereClause[key];
+      });
+    }
   }
 
-  const sells = await prisma.sell.findMany({
-    where: whereClause,
-    orderBy: {
-      createdAt: 'desc',
-    },
-    include: {
-      branch: true,
-      customer: true,
-      createdBy: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
+  console.log("Final whereClause:", JSON.stringify(whereClause, null, 2));
+
+  try {
+    const sells = await prisma.sell.findMany({
+      where: whereClause,
+      orderBy: {
+        createdAt: 'desc',
       },
-      items: {
-        include: {
-          product: {
-            include: {
-              unitOfMeasure: true,
-              category: true,
-            },
+      include: {
+        branch: true,
+        customer: true,
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
           },
-          shop: true,
-          unitOfMeasure: true,
-          batches: {
-            include: {
-              batch: {
-                include: {
-                  product: true,
+        },
+        items: {
+          include: {
+            product: {
+              include: {
+                unitOfMeasure: true,
+                category: true,
+              },
+            },
+            shop: true,
+            unitOfMeasure: true,
+            batches: {
+              include: {
+                batch: {
+                  include: {
+                    product: true,
+                  },
                 },
               },
             },
           },
         },
+        _count: {
+          select: { items: true },
+        },
       },
-      _count: {
-        select: { items: true },
-      },
-    },
-  });
-console.log("sell count store", sells.length)
-  return {
-    sells,
-    count: sells.length,
-  };
+    });
+
+    console.log("Sell count store:", sells.length);
+    console.log("First few sells (if any):", sells.slice(0, 3));
+
+    return {
+      sells,
+      count: sells.length,
+    };
+  } catch (error) {
+    console.error("Error fetching sells:", error);
+    throw error;
+  }
 };
 
 const unlockSell = async (id) => {
