@@ -2109,11 +2109,12 @@ const getAllSellsForStore = async ({
   // Filter by customer name if provided (case-insensitive search)
   if (customerName && customerName.trim()) {
     console.log("Customer name filter:", customerName.trim());
+    // Use a different approach for case-insensitive search
+    const customerNameLower = customerName.trim().toLowerCase();
     additionalFilters.push({
       customer: {
         name: {
-          contains: customerName.trim(),
-          mode: 'insensitive',
+          contains: customerNameLower,
         },
       },
     });
@@ -2122,11 +2123,12 @@ const getAllSellsForStore = async ({
   // Filter by salesperson name if provided (case-insensitive search)
   if (salesPersonName && salesPersonName.trim()) {
     console.log("Salesperson name filter:", salesPersonName.trim());
+    // Use a different approach for case-insensitive search
+    const salesPersonNameLower = salesPersonName.trim().toLowerCase();
     additionalFilters.push({
       createdBy: {
         name: {
-          contains: salesPersonName.trim(),
-          mode: 'insensitive',
+          contains: salesPersonNameLower,
         },
       },
     });
@@ -2141,19 +2143,14 @@ const getAllSellsForStore = async ({
     if (whereClause.AND) {
       whereClause.AND = [...whereClause.AND, ...additionalFilters];
     } else {
-      // IMPORTANT: We need to include the existing conditions with AND
-      // The issue might be here - we're overwriting existing conditions
-      // Instead, let's create a proper structure
-      const baseConditions = { ...whereClause };
-      // Remove AND if it exists to avoid duplication
-      delete baseConditions.AND;
-      
       // Create a new AND array with all conditions
-      whereClause.AND = [baseConditions, ...additionalFilters];
+      whereClause.AND = [{ ...whereClause }, ...additionalFilters];
       
       // Clear the individual conditions since they're now in AND
-      Object.keys(baseConditions).forEach(key => {
-        delete whereClause[key];
+      Object.keys(whereClause).forEach(key => {
+        if (key !== 'AND') {
+          delete whereClause[key];
+        }
       });
     }
   }
@@ -2204,11 +2201,31 @@ const getAllSellsForStore = async ({
     });
 
     console.log("Sell count store:", sells.length);
-    console.log("First few sells (if any):", sells.slice(0, 3));
+    
+    // If we're using case-insensitive filtering in memory
+    let filteredSells = sells;
+    
+    // Apply case-insensitive filtering in memory if needed
+    if (customerName && customerName.trim()) {
+      const customerNameLower = customerName.trim().toLowerCase();
+      filteredSells = filteredSells.filter(sell => 
+        sell.customer && sell.customer.name.toLowerCase().includes(customerNameLower)
+      );
+    }
+    
+    if (salesPersonName && salesPersonName.trim()) {
+      const salesPersonNameLower = salesPersonName.trim().toLowerCase();
+      filteredSells = filteredSells.filter(sell => 
+        sell.createdBy && sell.createdBy.name.toLowerCase().includes(salesPersonNameLower)
+      );
+    }
+    
+    console.log("Filtered sell count:", filteredSells.length);
+    console.log("First few sells (if any):", filteredSells.slice(0, 3));
 
     return {
-      sells,
-      count: sells.length,
+      sells: filteredSells,
+      count: filteredSells.length,
     };
   } catch (error) {
     console.error("Error fetching sells:", error);
