@@ -23,7 +23,7 @@ const getShopByName = async (name) => {
 
 const getAllshop = async () => {
   const shops = await prisma.shop.findMany();
-console.log("shop",shop)
+console.log("shop",shops)
   return {
     shops,
     count: shops.length,
