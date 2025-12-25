@@ -975,6 +975,7 @@ enum DocumentType {
 enum NotificationType {
 SELL_READY_FOR_DELIVERY
 SELL_CANCELLED
+Done
 
 Payment
 Inventory
