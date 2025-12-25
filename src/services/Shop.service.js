@@ -22,11 +22,11 @@ const getShopByName = async (name) => {
 };
 
 const getAllshop = async () => {
-  const shop = await prisma.shop.findMany();
-
+  const shops = await prisma.shop.findMany();
+console.log("shop",shop)
   return {
-    shop,
-    count: shop.length,
+    shops,
+    count: shops.length,
   };
 };
 // Get all Shops
