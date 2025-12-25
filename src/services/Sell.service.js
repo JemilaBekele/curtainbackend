@@ -236,6 +236,13 @@ const getAllSells = async ({
           },
         },
       },
+      SellStockCorrection: {
+        select: {
+          id: true,
+          status: true, // Only including status as requested
+          createdAt: true,
+        },
+      },
       _count: {
         select: { items: true },
       },
@@ -1174,9 +1181,6 @@ const deleteSell = async (id, userId) => {
   return { message: 'Sale deleted successfully with stock reversal' };
 };
 
-// Complete Sale (Deliver items and update stock)
-// Complete Sale Delivery - Deliver specific items based on provided item IDs\
-
 const completeSaleDelivery = async (saleId, deliveryData, userId) => {
   const sell = await getSellById(saleId);
 
@@ -1977,6 +1981,12 @@ const getAllSellsuser = async ({
           },
         },
       },
+      SellStockCorrection: {
+        select: {
+          id: true,
+          status: true, // Only including status as requested
+        },
+      },
       _count: {
         select: { items: true },
       },
@@ -2161,6 +2171,12 @@ const getAllSellsForStore = async ({
                 },
               },
             },
+          },
+        },
+        SellStockCorrection: {
+          select: {
+            id: true,
+            status: true, // Only including status as requested
           },
         },
         _count: {
