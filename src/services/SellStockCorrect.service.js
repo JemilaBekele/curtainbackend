@@ -1,3 +1,5 @@
+/* eslint-disable no-restricted-syntax */
+/* eslint-disable no-await-in-loop */
 const httpStatus = require('http-status');
 const { subMonths } = require('date-fns');
 
@@ -652,6 +654,7 @@ const approveSellStockCorrection = async (
         (adjustment, correctionItem) => {
           // Only include delivered items in the adjustment
           if (correctionItem.itemSaleStatus !== 'DELIVERED') {
+            console.log(`Skipping item ${correctionItem.id} - status: ${correctionItem.itemSaleStatus}`);
             return adjustment;
           }
 
@@ -665,32 +668,27 @@ const approveSellStockCorrection = async (
             );
           }
 
-          const isAddition = correctionItem.quantity > 0;
-          const absoluteQuantity = Math.abs(correctionItem.quantity);
+          console.log(`Processing correction item:`, {
+            id: correctionItem.id,
+            productId: correctionItem.productId,
+            quantity: correctionItem.quantity,
+            unitPrice: correctionItem.unitPrice,
+            status: correctionItem.itemSaleStatus
+          });
 
-          if (isAddition) {
-            // For additions: Use the correction item's unit price
-            const itemValueAdjustment =
-              absoluteQuantity * correctionItem.unitPrice;
-            return adjustment + itemValueAdjustment;
-          }
-
-          // For subtractions: Find the corresponding sell item and use its unit price
-          const sellItem = sell.items.find(
-            (item) =>
-              item.productId === correctionItem.productId &&
-              item.shopId === correctionItem.shopId,
-          );
-
-          if (sellItem) {
-            const itemValueAdjustment = absoluteQuantity * sellItem.unitPrice;
-            return adjustment - itemValueAdjustment;
-          }
-
-          return adjustment;
+          // Calculate adjustment: quantity × unitPrice
+          // Negative quantity = negative adjustment (customer pays less)
+          // Positive quantity = positive adjustment (customer pays more)
+          const itemAdjustment = correctionItem.quantity * correctionItem.unitPrice;
+          console.log(`Item adjustment: ${correctionItem.quantity} × ${correctionItem.unitPrice} = ${itemAdjustment}`);
+          
+          return adjustment + itemAdjustment;
         },
         0,
       );
+
+      console.log('Final netTotalAdjustment:', netTotalAdjustment);
+      console.log('Original sell NetTotal:', sell.NetTotal);
     }
 
     // Prepare all operations for each DELIVERED sell stock correction item
@@ -698,6 +696,7 @@ const approveSellStockCorrection = async (
       async (item) => {
         // Only process delivered items
         if (item.itemSaleStatus !== 'DELIVERED') {
+          console.log(`Skipping stock update for item ${item.id} - status: ${item.itemSaleStatus}`);
           return [];
         }
 
@@ -890,6 +889,9 @@ const approveSellStockCorrection = async (
       // Ensure net total doesn't go negative
       const finalNetTotal = Math.max(0, newNetTotal);
 
+      console.log(`Updating sell NetTotal: ${sell.NetTotal} + ${netTotalAdjustment} = ${newNetTotal}`);
+      console.log(`Final NetTotal: ${finalNetTotal}`);
+
       await tx.sell.update({
         where: { id: sell.id },
         data: {
@@ -897,6 +899,12 @@ const approveSellStockCorrection = async (
           updatedById: userId,
           updatedAt: new Date(),
         },
+      });
+    } else {
+      console.log('No net total update needed:', {
+        hasSell: !!sell,
+        netTotalAdjustment,
+        sellNetTotal: sell?.NetTotal
       });
     }
 
