@@ -2209,6 +2209,7 @@ const unlockSell = async (id) => {
   if (!currentSell) {
     throw new Error(`Sell with id ${id} not found`);
   }
+  console.log('lock', currentSell.locked);
 
   // Toggle the lock state
   const newLockedState = !currentSell.locked;
@@ -2220,7 +2221,7 @@ const unlockSell = async (id) => {
       lockedAt: newLockedState ? new Date() : null,
     },
   });
-
+  console.log('final', sell);
   return sell;
 };
 module.exports = {
