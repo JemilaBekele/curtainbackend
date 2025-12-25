@@ -43,6 +43,21 @@ const getSellStockCorrectionsBySellId = catchAsync(async (req, res) => {
   });
 });
 
+const getSellStockCorrectionfilterId = catchAsync(async (req, res) => {
+  console.log('sell id', req.params.sellId);
+  console.log('user id', req.user.id);
+
+  const sellStockCorrections =
+    await sellStockCorrectionService.getSellStockCorrectionfilterId(
+      req.params.sellId,
+      req.user.id,
+    );
+  res.status(httpStatus.OK).send({
+    success: true,
+    sellStockCorrections,
+    count: sellStockCorrections.length,
+  });
+});
 // Get Sell Stock Correction by Reference
 const getSellStockCorrectionByReference = catchAsync(async (req, res) => {
   const sellStockCorrection =
@@ -147,4 +162,5 @@ module.exports = {
   rejectSellStockCorrection,
   deleteSellStockCorrection,
   getSellByIdforsellcorrection,
+  getSellStockCorrectionfilterId,
 };

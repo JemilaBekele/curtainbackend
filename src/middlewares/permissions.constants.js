@@ -337,18 +337,6 @@ module.exports = {
       name: 'CREATE_SELL_STOCK_CORRECTION',
       description: 'Create new sell stock corrections',
     },
-    VIEW: {
-      name: 'VIEW_SELL_STOCK_CORRECTION',
-      description: 'View sell stock correction details',
-    },
-    VIEW_ALL: {
-      name: 'VIEW_ALL_SELL_STOCK_CORRECTIONS',
-      description: 'View all sell stock corrections',
-    },
-    UPDATE: {
-      name: 'UPDATE_SELL_STOCK_CORRECTION',
-      description: 'Update sell stock correction information',
-    },
     APPROVE: {
       name: 'APPROVE_SELL_STOCK_CORRECTION',
       description: 'Approve sell stock corrections',
