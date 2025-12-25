@@ -30,6 +30,12 @@ router.get(
   // checkPermission('VIEW_SHOP'),
   shopController.getShops,
 );
+router.get(
+  '/api/shops/get/all',
+  auth,
+  // checkPermission('VIEW_SHOP'),
+  shopController.getAllshop,
+);
 
 router.get(
   '/api/shops/based/user',

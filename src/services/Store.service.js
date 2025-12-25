@@ -22,7 +22,14 @@ const getStoreByName = async (name) => {
   });
   return store;
 };
+const getAllStore = async () => {
+  const store = await prisma.store.findMany();
 
+  return {
+    store,
+    count: store.length,
+  };
+};
 // Get all Stores
 const getAllStores = async (userId, filter = {}) => {
   // Get the user with their accessible stores
@@ -383,6 +390,7 @@ const getAllStoresStocks = async ({ startDate, endDate } = {}) => {
   };
 };
 module.exports = {
+  getAllStore,
   getStoreById,
   getStoreByName,
   getAllStores,

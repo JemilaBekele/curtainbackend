@@ -25,10 +25,18 @@ const getShop = catchAsync(async (req, res) => {
   });
 });
 
-// Get all Shops
+// Get all Shops 
 const getShops = catchAsync(async (req, res) => {
   const userId = req.user.id; // ✅ extract userId
   const result = await shopService.getAllShops(userId);
+  res.status(httpStatus.OK).send({
+    success: true,
+    ...result,
+  });
+});
+const getAllshop = catchAsync(async (req, res) => {
+  const userId = req.user.id; // ✅ extract userId
+  const result = await shopService.getAllshop(userId);
   res.status(httpStatus.OK).send({
     success: true,
     ...result,
@@ -93,6 +101,7 @@ const deleteShop = catchAsync(async (req, res) => {
 
 module.exports = {
   createShop,
+  getAllshop,
   getShop,
   getShops,
   updateShop,

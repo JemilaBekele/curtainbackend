@@ -14,6 +14,12 @@ router.post(
   // checkPermission('CREATE_STORE'),
   storeController.createStore,
 );
+router.get(
+  '/api/stores/get/all',
+  auth,
+  // checkPermission('CREATE_STORE'),
+  storeController.getAllStore,
+);
 
 // Get a store by ID
 router.get(

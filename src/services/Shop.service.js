@@ -21,6 +21,14 @@ const getShopByName = async (name) => {
   return shop;
 };
 
+const getAllshop = async () => {
+  const shop = await prisma.shop.findMany();
+
+  return {
+    shop,
+    count: shop.length,
+  };
+};
 // Get all Shops
 
 const getAllShops = async (userId) => {
@@ -379,6 +387,7 @@ const getAvailableBatchesByProductAndShop = async (productId, shopId) => {
 };
 module.exports = {
   getShopById,
+  getAllshop,
   getShopByName,
   getAllShops,
   createShop,

@@ -35,6 +35,13 @@ const getStores = catchAsync(async (req, res) => {
     ...result,
   });
 });
+const getAllStore = catchAsync(async (req, res) => {
+  const result = await storeService.getAllStore();
+  res.status(httpStatus.OK).send({
+    success: true,
+    ...result,
+  });
+});
 
 // Update Store
 const updateStore = catchAsync(async (req, res) => {
@@ -93,4 +100,5 @@ module.exports = {
   getAllStockLedgers,
   getAllShopStocks,
   getAllStoresStocks,
+  getAllStore,
 };

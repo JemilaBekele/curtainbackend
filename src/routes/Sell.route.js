@@ -7,12 +7,7 @@ const auth = require('../middlewares/auth');
 const checkPermission = require('../middlewares/permission.middleware');
 
 // Create a sell
-router.post(
-  '/api/sells',
-  auth,
-  checkPermission('CREATE'),
-  sellController.createSell,
-);
+router.post('/api/sells', auth, sellController.createSell);
 router.get(
   '/api/sells/user/based',
   auth,
