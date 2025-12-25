@@ -333,13 +333,18 @@ const createTransfer = async (transferBody, userId) => {
 };
 // Update Transfer
 // Update Transfer
-const updateTransfer = async (transferId, transferBody) => {
+const updateTransfer = async (transferId, transferBody, userId) => {
   // Check if transfer exists
   const existingTransfer = await getTransferById(transferId);
   if (!existingTransfer) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Transfer not found');
   }
-
+  if (existingTransfer.createdById !== userId) {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      'Only the creator can update this transfer',
+    );
+  }
   // Cannot update completed or cancelled transfers
   if (existingTransfer.status !== 'PENDING') {
     throw new ApiError(

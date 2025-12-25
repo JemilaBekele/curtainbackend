@@ -55,6 +55,7 @@ const updatePurchase = catchAsync(async (req, res) => {
   const purchase = await purchaseService.updatePurchase(
     req.params.id,
     req.body,
+    req.user.id,
   );
   res.status(httpStatus.OK).send({
     success: true,

@@ -196,11 +196,18 @@ const createPurchase = async (purchaseBody, userId) => {
 };
 
 // Update Purchase
-const updatePurchase = async (purchaseId, purchaseBody) => {
+const updatePurchase = async (purchaseId, purchaseBody, userId) => {
   // Check if purchase exists
   const existingPurchase = await getPurchaseById(purchaseId);
   if (!existingPurchase) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Purchase not found');
+  }
+  // Check if current user is the creator of this purchase
+  if (existingPurchase.createdById !== userId) {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      'Only the creator can update this purchase',
+    );
   }
 
   // Check if invoice number already exists (excluding current purchase)

@@ -122,147 +122,400 @@ const getSellStockCorrectionsBySellId = async (sellId) => {
 };
 
 const createSellStockCorrection = async (sellStockCorrectionBody, userId) => {
-  const { items: itemsString, ...restSellStockCorrectionBody } =
-    sellStockCorrectionBody;
-  const items =
-    typeof itemsString === 'string' ? JSON.parse(itemsString) : itemsString;
-
-  // Validate items array exists
-  if (!items || !Array.isArray(items)) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      'Sell stock correction must have items array',
+  try {
+    console.log('🔍 [createSellStockCorrection] Starting function');
+    console.log('🔍 [createSellStockCorrection] userId:', userId);
+    console.log(
+      '🔍 [createSellStockCorrection] Request body:',
+      JSON.stringify(sellStockCorrectionBody, null, 2),
     );
-  }
-
-  // Filter out items with zero quantity
-  const nonZeroItems = items.filter((item) => Number(item.quantity) !== 0);
-
-  // Check if there are any items left after filtering
-  if (nonZeroItems.length === 0) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      'Sell stock correction must have at least one item with non-zero quantity',
+    console.log(
+      '🔍 [createSellStockCorrection] Request body keys:',
+      Object.keys(sellStockCorrectionBody),
     );
-  }
 
-  // Validate individual item properties and calculate totals
-  let totalCorrectionAmount = 0;
-  const itemsWithCalculations = nonZeroItems.map((item, index) => {
-    if (!item.productId) {
-      throw new ApiError(
-        httpStatus.BAD_REQUEST,
-        `Item ${index + 1} is missing required field (productId)`,
-      );
-    }
-    if (!item.unitOfMeasureId) {
-      throw new ApiError(
-        httpStatus.BAD_REQUEST,
-        `Item ${index + 1} is missing required field (unitOfMeasureId)`,
-      );
-    }
-    if (
-      item.quantity === undefined ||
-      item.quantity === null ||
-      Number.isNaN(Number(item.quantity))
-    ) {
-      throw new ApiError(
-        httpStatus.BAD_REQUEST,
-        `Item ${index + 1} has invalid quantity`,
-      );
-    }
-    // Removed zero quantity validation since we filtered them out
+    const { items: itemsString, ...restSellStockCorrectionBody } =
+      sellStockCorrectionBody;
+    console.log(
+      '🔍 [createSellStockCorrection] itemsString type:',
+      typeof itemsString,
+    );
+    console.log(
+      '🔍 [createSellStockCorrection] itemsString value:',
+      itemsString,
+    );
+    console.log(
+      '🔍 [createSellStockCorrection] restSellStockCorrectionBody:',
+      restSellStockCorrectionBody,
+    );
 
-    if (!item.unitPrice || item.unitPrice < 0) {
+    let items;
+    try {
+      items =
+        typeof itemsString === 'string' ? JSON.parse(itemsString) : itemsString;
+      console.log('✅ [createSellStockCorrection] Successfully parsed items');
+    } catch (parseError) {
+      console.error(
+        '❌ [createSellStockCorrection] JSON parse error:',
+        parseError.message,
+      );
+      console.error(
+        '❌ [createSellStockCorrection] itemsString that failed to parse:',
+        itemsString,
+      );
       throw new ApiError(
         httpStatus.BAD_REQUEST,
-        `Item ${index + 1} must have a valid unit price`,
+        'Invalid items format. Must be valid JSON string or array',
       );
     }
 
-    // Validate batches if provided
-    if (item.batches && Array.isArray(item.batches)) {
-      const batchQuantitySum = item.batches.reduce(
-        (sum, batch) => sum + (batch.quantity || 0),
-        0,
+    console.log(
+      '🔍 [createSellStockCorrection] Parsed items:',
+      JSON.stringify(items, null, 2),
+    );
+    console.log(
+      '🔍 [createSellStockCorrection] Is items array?',
+      Array.isArray(items),
+    );
+
+    // Validate items array exists
+    if (!items || !Array.isArray(items)) {
+      console.error('❌ [createSellStockCorrection] Items validation failed');
+      console.error('❌ [createSellStockCorrection] Items value:', items);
+      console.error('❌ [createSellStockCorrection] Items type:', typeof items);
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'Sell stock correction must have items array',
       );
-      // Use the actual quantity (could be negative) for comparison
-      if (batchQuantitySum !== item.quantity) {
+    }
+    console.log(
+      '✅ [createSellStockCorrection] Items array is valid, length:',
+      items.length,
+    );
+
+    // Log each item before filtering
+    console.log('🔍 [createSellStockCorrection] All items before filtering:');
+    items.forEach((item, index) => {
+      console.log(`  Item ${index + 1}:`, {
+        productId: item.productId,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        hasBatches: !!item.batches,
+        batchesCount: item.batches ? item.batches.length : 0,
+      });
+    });
+
+    // Filter out items with zero quantity
+    const nonZeroItems = items.filter((item) => {
+      const quantity = Number(item.quantity);
+      const isZero = quantity === 0;
+      console.log(
+        `🔍 [createSellStockCorrection] Filter check - Item quantity: ${item.quantity}, Number(quantity): ${quantity}, isZero: ${isZero}`,
+      );
+      return quantity !== 0;
+    });
+
+    console.log(
+      '🔍 [createSellStockCorrection] nonZeroItems count:',
+      nonZeroItems.length,
+    );
+    console.log(
+      '🔍 [createSellStockCorrection] nonZeroItems:',
+      JSON.stringify(nonZeroItems, null, 2),
+    );
+
+    // Check if there are any items left after filtering
+    if (nonZeroItems.length === 0) {
+      console.error(
+        '❌ [createSellStockCorrection] All items have zero quantity',
+      );
+      console.error(
+        '❌ [createSellStockCorrection] Original items count:',
+        items.length,
+      );
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'Sell stock correction must have at least one item with non-zero quantity',
+      );
+    }
+
+    // Validate individual item properties and calculate totals
+    let totalCorrectionAmount = 0;
+    const itemsWithCalculations = nonZeroItems.map((item, index) => {
+      console.log(
+        `🔍 [createSellStockCorrection] Processing item ${index + 1}:`,
+        {
+          productId: item.productId,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          batches: item.batches,
+        },
+      );
+
+      if (!item.productId) {
+        console.error(
+          `❌ [createSellStockCorrection] Item ${index + 1} missing productId`,
+        );
         throw new ApiError(
           httpStatus.BAD_REQUEST,
-          `Item ${
-            index + 1
-          } batch quantities (${batchQuantitySum}) must match item quantity (${
-            item.quantity
-          })`,
+          `Item ${index + 1} is missing required field (productId)`,
         );
       }
-    }
+      if (!item.unitOfMeasureId) {
+        console.error(
+          `❌ [createSellStockCorrection] Item ${
+            index + 1
+          } missing unitOfMeasureId`,
+        );
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Item ${index + 1} is missing required field (unitOfMeasureId)`,
+        );
+      }
 
-    // Calculate total price for the item
-    const totalPrice = item.unitPrice * Math.abs(item.quantity);
-    // For negative quantities, subtract from total
-    totalCorrectionAmount += item.quantity >= 0 ? totalPrice : -totalPrice;
+      const quantityNum = Number(item.quantity);
+      console.log(
+        `🔍 [createSellStockCorrection] Item ${index + 1} quantity validation:`,
+        {
+          original: item.quantity,
+          parsed: quantityNum,
+          isNaN: Number.isNaN(quantityNum),
+        },
+      );
 
-    return {
-      ...item,
-      totalPrice,
-    };
-  });
+      if (
+        item.quantity === undefined ||
+        item.quantity === null ||
+        Number.isNaN(quantityNum)
+      ) {
+        console.error(
+          `❌ [createSellStockCorrection] Item ${
+            index + 1
+          } has invalid quantity:`,
+          item.quantity,
+        );
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Item ${index + 1} has invalid quantity`,
+        );
+      }
 
-  // Clean up empty string values
-  const cleanedSellStockCorrectionBody = {
-    ...restSellStockCorrectionBody,
-    sellId:
-      restSellStockCorrectionBody.sellId === ''
-        ? null
-        : restSellStockCorrectionBody.sellId,
-  };
-
-  // Create the sell stock correction
-  const sellStockCorrection = await prisma.sellStockCorrection.create({
-    data: {
-      ...cleanedSellStockCorrectionBody,
-      total: totalCorrectionAmount,
-      createdById: userId,
-      updatedById: userId,
-      items: {
-        create: itemsWithCalculations.map((item) => ({
-          productId: item.productId,
-          shopId: item.shopId || null,
-          unitOfMeasureId: item.unitOfMeasureId,
+      console.log(
+        `🔍 [createSellStockCorrection] Item ${
+          index + 1
+        } unitPrice validation:`,
+        {
           unitPrice: item.unitPrice,
-          totalPrice: item.totalPrice,
-          quantity: item.quantity, // Keep the original negative/positive value
-          batches:
-            item.batches && item.batches.length > 0
-              ? {
-                  create: item.batches.map((batch) => ({
-                    batchId: batch.batchId,
-                    quantity: batch.quantity,
-                  })),
-                }
-              : undefined,
-        })),
-      },
-    },
-    include: {
-      items: {
+          isValid: item.unitPrice && item.unitPrice >= 0,
+        },
+      );
+
+      if (!item.unitPrice || item.unitPrice < 0) {
+        console.error(
+          `❌ [createSellStockCorrection] Item ${
+            index + 1
+          } has invalid unit price:`,
+          item.unitPrice,
+        );
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Item ${index + 1} must have a valid unit price`,
+        );
+      }
+
+      // Validate batches if provided
+      if (item.batches && Array.isArray(item.batches)) {
+        console.log(
+          `🔍 [createSellStockCorrection] Item ${
+            index + 1
+          } has batches, count:`,
+          item.batches.length,
+        );
+        const batchQuantitySum = item.batches.reduce((sum, batch) => {
+          const batchQty = batch.quantity || 0;
+          console.log(`  Batch quantity: ${batchQty}`);
+          return sum + batchQty;
+        }, 0);
+
+        console.log(
+          `🔍 [createSellStockCorrection] Item ${index + 1} batch validation:`,
+          {
+            batchQuantitySum,
+            itemQuantity: item.quantity,
+            match: batchQuantitySum === item.quantity,
+          },
+        );
+
+        if (batchQuantitySum !== item.quantity) {
+          console.error(
+            `❌ [createSellStockCorrection] Item ${
+              index + 1
+            } batch quantities don't match`,
+          );
+          throw new ApiError(
+            httpStatus.BAD_REQUEST,
+            `Item ${
+              index + 1
+            } batch quantities (${batchQuantitySum}) must match item quantity (${
+              item.quantity
+            })`,
+          );
+        }
+      }
+
+      // Calculate total price for the item
+      const totalPrice = item.unitPrice * Math.abs(quantityNum);
+      totalCorrectionAmount += quantityNum >= 0 ? totalPrice : -totalPrice;
+
+      console.log(
+        `🔍 [createSellStockCorrection] Item ${index + 1} calculations:`,
+        {
+          unitPrice: item.unitPrice,
+          quantity: quantityNum,
+          totalPrice,
+          totalCorrectionAmount,
+        },
+      );
+
+      return {
+        ...item,
+        totalPrice,
+      };
+    });
+
+    console.log(
+      '✅ [createSellStockCorrection] All items validated successfully',
+    );
+    console.log(
+      '🔍 [createSellStockCorrection] Final totalCorrectionAmount:',
+      totalCorrectionAmount,
+    );
+
+    // Clean up empty string values
+    const cleanedSellStockCorrectionBody = {
+      ...restSellStockCorrectionBody,
+      sellId:
+        restSellStockCorrectionBody.sellId === ''
+          ? null
+          : restSellStockCorrectionBody.sellId,
+    };
+
+    console.log(
+      '🔍 [createSellStockCorrection] Cleaned body:',
+      cleanedSellStockCorrectionBody,
+    );
+    console.log(
+      '🔍 [createSellStockCorrection] sellId:',
+      cleanedSellStockCorrectionBody.sellId,
+    );
+
+    // Create the sell stock correction
+    console.log(
+      '🔍 [createSellStockCorrection] Attempting to create sellStockCorrection in database...',
+    );
+
+    try {
+      const sellStockCorrection = await prisma.sellStockCorrection.create({
+        data: {
+          ...cleanedSellStockCorrectionBody,
+          total: totalCorrectionAmount,
+          createdById: userId,
+          updatedById: userId,
+          items: {
+            create: itemsWithCalculations.map((item, index) => {
+              console.log(
+                `🔍 [createSellStockCorrection] Creating database item ${
+                  index + 1
+                }:`,
+                {
+                  productId: item.productId,
+                  quantity: item.quantity,
+                  unitPrice: item.unitPrice,
+                  totalPrice: item.totalPrice,
+                  hasBatches: !!(item.batches && item.batches.length > 0),
+                },
+              );
+
+              return {
+                productId: item.productId,
+                shopId: item.shopId || null,
+                unitOfMeasureId: item.unitOfMeasureId,
+                unitPrice: item.unitPrice,
+                totalPrice: item.totalPrice,
+                quantity: item.quantity,
+                batches:
+                  item.batches && item.batches.length > 0
+                    ? {
+                        create: item.batches.map((batch, batchIndex) => ({
+                          batchId: batch.batchId,
+                          quantity: batch.quantity,
+                        })),
+                      }
+                    : undefined,
+              };
+            }),
+          },
+        },
         include: {
-          product: true,
-          unitOfMeasure: true,
-          shop: true,
-          batches: {
+          items: {
             include: {
-              batch: true,
+              product: true,
+              unitOfMeasure: true,
+              shop: true,
+              batches: {
+                include: {
+                  batch: true,
+                },
+              },
             },
           },
         },
-      },
-    },
-  });
+      });
 
-  return sellStockCorrection;
+      console.log(
+        '✅ [createSellStockCorrection] Successfully created sellStockCorrection',
+      );
+      console.log(
+        '✅ [createSellStockCorrection] Created ID:',
+        sellStockCorrection.id,
+      );
+
+      return sellStockCorrection;
+    } catch (dbError) {
+      console.error(
+        '❌ [createSellStockCorrection] Database error:',
+        dbError.message,
+      );
+      console.error(
+        '❌ [createSellStockCorrection] Database error stack:',
+        dbError.stack,
+      );
+
+      // Check for specific Prisma errors
+      if (dbError.code === 'P2002') {
+        console.error(
+          '❌ [createSellStockCorrection] Unique constraint violation',
+        );
+      } else if (dbError.code === 'P2003') {
+        console.error(
+          '❌ [createSellStockCorrection] Foreign key constraint failed',
+        );
+      } else if (dbError.code === 'P2025') {
+        console.error('❌ [createSellStockCorrection] Record not found');
+      }
+
+      throw dbError;
+    }
+  } catch (error) {
+    console.error(
+      '❌ [createSellStockCorrection] Overall function error:',
+      error.message,
+    );
+    console.error('❌ [createSellStockCorrection] Error stack:', error.stack);
+
+    // Re-throw the error so it can be handled by the calling function
+    throw error;
+  }
 };
 
 // Update SellStockCorrection
