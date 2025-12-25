@@ -2201,7 +2201,8 @@ const getAllSellsForStore = async ({
 };
 
 const unlockSell = async (id) => {
-  // First, get the current state
+  console.log('=== Starting unlockSell for ID:', id);
+  
   const currentSell = await prisma.sell.findUnique({
     where: { id },
   });
@@ -2209,10 +2210,12 @@ const unlockSell = async (id) => {
   if (!currentSell) {
     throw new Error(`Sell with id ${id} not found`);
   }
-  console.log('lock', currentSell.locked);
+  
+  console.log('Current locked state:', currentSell.locked);
+  console.log('Current lockedAt:', currentSell.lockedAt);
 
-  // Toggle the lock state
   const newLockedState = !currentSell.locked;
+  console.log('Will update to locked:', newLockedState);
 
   const sell = await prisma.sell.update({
     where: { id },
@@ -2221,7 +2224,18 @@ const unlockSell = async (id) => {
       lockedAt: newLockedState ? new Date() : null,
     },
   });
-  console.log('final', sell);
+  
+  console.log('Updated locked:', sell.locked);
+  console.log('Updated lockedAt:', sell.lockedAt);
+  
+  // Verify by fetching again
+  const verifySell = await prisma.sell.findUnique({
+    where: { id },
+  });
+  
+  console.log('Verified locked:', verifySell?.locked);
+  console.log('Verified lockedAt:', verifySell?.lockedAt);
+  
   return sell;
 };
 module.exports = {
