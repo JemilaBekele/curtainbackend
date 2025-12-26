@@ -1855,158 +1855,163 @@ const getAllSellsuser = async ({
   startDate,
   endDate,
   userId,
-  customerId,
+  customerName,
   status,
+  page = 1,
+  limit = 20,
 }) => {
+  // Validate required parameters
   if (!userId) {
     throw new Error('User ID is required');
   }
 
+  // Initialize where clause with required condition
   const whereClause = {
     createdById: userId,
   };
-
-  // Add customer filter if provided
-  if (customerId) {
-    whereClause.customerId = customerId;
-  }
 
   // Add status filter if provided
   if (status) {
     // Handle multiple statuses (comma-separated) or single status
     if (status.includes(',')) {
-      const statuses = status.split(',').map((s) => s.trim());
-      whereClause.status = {
-        in: statuses,
-      };
+      const statuses = status
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => s);
+      if (statuses.length > 0) {
+        whereClause.status = { in: statuses };
+      }
     } else {
       whereClause.status = status;
     }
   }
 
-  // If BOTH startDate and endDate are provided, filter by date range
-  if (startDate && endDate) {
-    try {
-      // Parse dates to local time
-      const [startYear, startMonth, startDay] = startDate.split('-');
-      const [endYear, endMonth, endDay] = endDate.split('-');
+  // Handle date filtering
+  try {
+    if (startDate && endDate) {
+      // Both dates provided
+      const startOfRange = new Date(startDate);
+      const endOfRange = new Date(endDate);
 
-      const startOfRange = new Date(
-        startYear,
-        startMonth - 1,
-        startDay,
-        0,
-        0,
-        0,
-        0,
-      );
-      const endOfRange = new Date(
-        endYear,
-        endMonth - 1,
-        endDay,
-        23,
-        59,
-        59,
-        999,
-      );
+      if (
+        Number.isNaN(startOfRange.getTime()) ||
+        Number.isNaN(endOfRange.getTime())
+      ) {
+        throw new Error('Invalid date format');
+      }
+
+      // Set start to beginning of day, end to end of day
+      startOfRange.setHours(0, 0, 0, 0);
+      endOfRange.setHours(23, 59, 59, 999);
 
       whereClause.createdAt = {
         gte: startOfRange,
         lte: endOfRange,
       };
-    } catch (error) {
-      throw new Error('Invalid date format. Use YYYY-MM-DD');
+    } else if (startDate && !endDate) {
+      // Only start date provided
+      const startOfRange = new Date(startDate);
+      if (Number.isNaN(startOfRange.getTime())) {
+        throw new Error('Invalid start date format');
+      }
+      startOfRange.setHours(0, 0, 0, 0);
+      whereClause.createdAt = { gte: startOfRange };
+    } else if (endDate && !startDate) {
+      // Only end date provided
+      const endOfRange = new Date(endDate);
+      if (Number.isNaN(endOfRange.getTime())) {
+        throw new Error('Invalid end date format');
+      }
+      endOfRange.setHours(23, 59, 59, 999);
+      const twelveMonthsAgo = new Date();
+      twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+
+      whereClause.createdAt = {
+        gte: twelveMonthsAgo,
+        lte: endOfRange,
+      };
+    } else {
+      // No dates provided, default to last 12 months
+      const twelveMonthsAgo = new Date();
+      twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+      whereClause.createdAt = { gte: twelveMonthsAgo };
     }
-  }
-  // If only startDate is provided, filter from that date to now
-  else if (startDate && !endDate) {
-    const [year, month, day] = startDate.split('-');
-    const startOfRange = new Date(year, month - 1, day, 0, 0, 0, 0);
-
-    whereClause.createdAt = {
-      gte: startOfRange,
-    };
-  }
-  // If only endDate is provided, filter from 12 months ago to that date
-  else if (endDate && !startDate) {
-    const [year, month, day] = endDate.split('-');
-    const endOfRange = new Date(year, month - 1, day, 23, 59, 59, 999);
-    const twelveMonthsAgo = subMonths(new Date(), 12);
-
-    whereClause.createdAt = {
-      gte: twelveMonthsAgo,
-      lte: endOfRange,
-    };
-  }
-  // If no dates provided, default to last 12 months
-  else {
-    whereClause.createdAt = {
-      gte: subMonths(new Date(), 12),
-    };
+  } catch (error) {
+    throw new Error(`Invalid date: ${error.message}`);
   }
 
-  const sells = await prisma.sell.findMany({
-    where: whereClause,
-    orderBy: {
-      createdAt: 'desc',
-    },
-    include: {
-      branch: true,
-      customer: true,
-      createdBy: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-      items: {
-        include: {
-          product: {
-            include: {
-              unitOfMeasure: true,
-              category: true,
-            },
+  // Calculate pagination
+  const skip = (page - 1) * limit;
+
+  // Execute the query with pagination
+  const [sells] = await Promise.all([
+    prisma.sell.findMany({
+      where: whereClause,
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: limit,
+      include: {
+        branch: true,
+        customer: true,
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
           },
-          shop: true,
-          unitOfMeasure: true,
-          batches: {
-            include: {
-              batch: {
-                include: {
-                  product: true,
+        },
+        items: {
+          include: {
+            product: {
+              include: {
+                unitOfMeasure: true,
+                category: true,
+              },
+            },
+            shop: true,
+            unitOfMeasure: true,
+            batches: {
+              include: {
+                batch: {
+                  include: {
+                    product: true,
+                  },
                 },
               },
             },
           },
         },
-      },
-      SellStockCorrection: {
-        select: {
-          id: true,
-          status: true, // Only including status as requested
+        SellStockCorrection: {
+          select: {
+            id: true,
+            status: true,
+          },
+        },
+        _count: {
+          select: { items: true },
         },
       },
-      _count: {
-        select: { items: true },
-      },
-    },
-  });
+    }),
+    prisma.sell.count({
+      where: whereClause,
+    }),
+  ]);
+
+  // Apply customer name filtering in memory if needed
+  let filteredSells = sells;
+  if (customerName && customerName.trim()) {
+    const customerNameLower = customerName.trim().toLowerCase();
+    filteredSells = sells.filter(
+      (sell) =>
+        sell.customer &&
+        sell.customer.name &&
+        sell.customer.name.toLowerCase().includes(customerNameLower),
+    );
+  }
 
   return {
-    sells,
-    count: sells.length,
-    meta: {
-      dateRange: {
-        requestedStart: startDate,
-        requestedEnd: endDate,
-        actualCount: sells.length,
-      },
-      filters: {
-        customerId,
-        status,
-      },
-    },
+    sells: filteredSells,
+    count: filteredSells.length,
   };
 };
 

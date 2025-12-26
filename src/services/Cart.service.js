@@ -1628,7 +1628,7 @@ const getWaitlistsByUser = async (userId, filters = {}) => {
             shopId: waitlist.cartItem.shopId,
             productId: waitlist.cartItem.productId,
             unitOfMeasureId: waitlist.cartItem.unitOfMeasureId,
-            quantity: waitlist.quantity, // Use waitlist quantity
+            quantity: waitlist.cartItem.quantity, // FIXED: Use cartItem quantity, not waitlist quantity
             unitPrice: waitlist.cartItem.unitPrice,
             totalPrice: waitlist.cartItem.totalPrice,
             notes: waitlist.cartItem.notes,
@@ -1648,7 +1648,7 @@ const getWaitlistsByUser = async (userId, filters = {}) => {
         cartId: waitlist.cartId,
         cartItemId: waitlist.cartItemId,
         note: waitlist.note,
-        quantity: waitlist.quantity,
+        quantity: waitlist.quantity, // This is the waitlist quantity (usually 1)
         createdById: waitlist.createdById,
         updatedById: waitlist.updatedById,
         createdAt: waitlist.createdAt,
@@ -1659,7 +1659,7 @@ const getWaitlistsByUser = async (userId, filters = {}) => {
         customer: waitlist.customer,
         branch: waitlist.branch,
         cart: waitlist.cart,
-        cartItem, // This might be null
+        cartItem, // This now has the correct cart item quantity
         createdBy: waitlist.createdBy,
         updatedBy: waitlist.updatedBy,
       };

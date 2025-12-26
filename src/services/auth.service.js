@@ -56,7 +56,6 @@ const login = async (email, password, ipAddr) => {
       stores: true, // Include assigned stores
     },
   });
-
   // Check if user exists and password matches
   if (!user || !(await userService.isPasswordMatch(user, password))) {
     if (user) {

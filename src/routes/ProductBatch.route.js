@@ -40,7 +40,7 @@ router.get(
 router.get(
   '/api/find/store/:storeId/stock/product',
   auth,
-  // checkPermission('VIEW_PRODUCT_BY_STORE_STOCK'),
+  // cmheckPermission('VIEW_PRODUCT_BY_STORE_STOCK'),
   productBatchController.getProductByStoreStock,
 );
 
