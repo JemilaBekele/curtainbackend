@@ -286,11 +286,13 @@ const getProductByStoreStock = async (storeId) => {
               include: {
                 category: true,
                 subCategory: true,
+                unitOfMeasure: true, // Include unit of measure
               },
             },
           },
         },
         store: true,
+        unitOfMeasure: true, // Include the unit of measure from store stock
       },
     });
 
@@ -315,10 +317,61 @@ const getProductByStoreStock = async (storeId) => {
 
     console.log(`Valid stocks: ${validStocks.length}, Invalid: ${storeStocks.length - validStocks.length}`);
 
-    const result = validStocks.map((storeStock) => ({
-      ...storeStock,
-      product: storeStock.batch.product,
-    }));
+    // Return enriched data with all necessary information
+    const result = validStocks.map((storeStock) => {
+      const product = storeStock.batch.product;
+      
+      return {
+        id: storeStock.id,
+        storeId: storeStock.storeId,
+        batchId: storeStock.batchId,
+        quantity: storeStock.quantity,
+        status: storeStock.status,
+        createdAt: storeStock.createdAt,
+        updatedAt: storeStock.updatedAt,
+        
+        // Store information
+        store: {
+          id: storeStock.store.id,
+          name: storeStock.store.name,
+          branchId: storeStock.store.branchId,
+        },
+        
+        // Batch information
+        batch: {
+          id: storeStock.batch.id,
+          batchNumber: storeStock.batch.batchNumber,
+          expiryDate: storeStock.batch.expiryDate,
+          price: storeStock.batch.price,
+        },
+        
+        // Product information with all details
+        product: {
+          id: product.id,
+          productCode: product.productCode,
+          name: product.name,
+          generic: product.generic,
+          description: product.description,
+          sellPrice: product.sellPrice,
+          imageUrl: product.imageUrl,
+          isActive: product.isActive,
+          
+          // Category and subcategory
+          category: product.category,
+          subCategory: product.subCategory,
+          
+          // Unit of measure information from product
+          unitOfMeasure: product.unitOfMeasure,
+        },
+        
+        // Unit of measure specific to this stock entry
+        unitOfMeasure: storeStock.unitOfMeasure,
+        
+        // Helper fields for frontend
+        availableQuantity: storeStock.quantity, // Original quantity
+        conversionFactor: storeStock.unitOfMeasure?.conversionFactor || 1,
+      };
+    });
 
     console.timeEnd('getProductByStoreStock');
     return result;
@@ -345,11 +398,13 @@ const getProductByShopStock = async (shopId) => {
               include: {
                 category: true,
                 subCategory: true,
+                unitOfMeasure: true, // Include unit of measure
               },
             },
           },
         },
         shop: true,
+        unitOfMeasure: true, // Include the unit of measure from shop stock
       },
     });
 
@@ -374,10 +429,61 @@ const getProductByShopStock = async (shopId) => {
 
     console.log(`Valid stocks: ${validStocks.length}, Invalid: ${shopStocks.length - validStocks.length}`);
 
-    const result = validStocks.map((shopStock) => ({
-      ...shopStock,
-      product: shopStock.batch.product,
-    }));
+    // Return enriched data with all necessary information
+    const result = validStocks.map((shopStock) => {
+      const product = shopStock.batch.product;
+      
+      return {
+        id: shopStock.id,
+        shopId: shopStock.shopId,
+        batchId: shopStock.batchId,
+        quantity: shopStock.quantity,
+        status: shopStock.status,
+        createdAt: shopStock.createdAt,
+        updatedAt: shopStock.updatedAt,
+        
+        // Shop information
+        shop: {
+          id: shopStock.shop.id,
+          name: shopStock.shop.name,
+          branchId: shopStock.shop.branchId,
+        },
+        
+        // Batch information
+        batch: {
+          id: shopStock.batch.id,
+          batchNumber: shopStock.batch.batchNumber,
+          expiryDate: shopStock.batch.expiryDate,
+          price: shopStock.batch.price,
+        },
+        
+        // Product information with all details
+        product: {
+          id: product.id,
+          productCode: product.productCode,
+          name: product.name,
+          generic: product.generic,
+          description: product.description,
+          sellPrice: product.sellPrice,
+          imageUrl: product.imageUrl,
+          isActive: product.isActive,
+          
+          // Category and subcategory
+          category: product.category,
+          subCategory: product.subCategory,
+          
+          // Unit of measure information from product
+          unitOfMeasure: product.unitOfMeasure,
+        },
+        
+        // Unit of measure specific to this stock entry
+        unitOfMeasure: shopStock.unitOfMeasure,
+        
+        // Helper fields for frontend
+        availableQuantity: shopStock.quantity, // Original quantity
+        conversionFactor: shopStock.unitOfMeasure?.conversionFactor || 1,
+      };
+    });
 
     console.timeEnd('getProductByShopStock');
     return result;
