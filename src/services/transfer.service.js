@@ -218,20 +218,51 @@ const createTransfer = async (transferBody, userId) => {
     );
   }
 
-  // Validate individual item properties
+  // Validate individual item properties (removed unitOfMeasureId check)
   items.forEach((item, index) => {
-    if (!item.productId || !item.batchId || !item.unitOfMeasureId) {
+    if (!item.productId || !item.batchId) {
+      // Removed !item.unitOfMeasureId
       throw new ApiError(
         httpStatus.BAD_REQUEST,
-        `Item ${
-          index + 1
-        } is missing required fields (productId, batchId, or unitOfMeasureId)`,
+        `Item ${index + 1} is missing required fields (productId or batchId)`, // Updated message
       );
     }
     if (item.quantity <= 0) {
       throw new ApiError(
         httpStatus.BAD_REQUEST,
         `Item ${index + 1} has invalid quantity`,
+      );
+    }
+  });
+
+  // Get all product IDs to fetch their unit of measures
+  const productIds = items.map((item) => item.productId);
+  const products = await prisma.product.findMany({
+    where: {
+      id: {
+        in: productIds,
+      },
+    },
+    select: {
+      id: true,
+      unitOfMeasureId: true,
+    },
+  });
+
+  // Create a map of productId to unitOfMeasureId
+  const productUnitMap = {};
+  products.forEach((product) => {
+    productUnitMap[product.id] = product.unitOfMeasureId;
+  });
+
+  // Check if all products were found
+  items.forEach((item, index) => {
+    if (!productUnitMap[item.productId]) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        `Item ${
+          index + 1
+        }: Product not found or has no unit of measure defined`,
       );
     }
   });
@@ -313,7 +344,7 @@ const createTransfer = async (transferBody, userId) => {
         create: items.map((item) => ({
           productId: item.productId,
           batchId: item.batchId,
-          unitOfMeasureId: item.unitOfMeasureId,
+          unitOfMeasureId: productUnitMap[item.productId], // Use the product's unit of measure
           quantity: item.quantity,
         })),
       },
