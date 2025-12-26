@@ -272,9 +272,6 @@ const updateProductBatchWithAdditionalPrices = async (batchId, updateBody) => {
 // Get product by store ID and stock ID
 const getProductByStoreStock = async (storeId) => {
   try {
-    console.time('getProductByStoreStock');
-    console.log(`Fetching store stocks for storeId: ${storeId}`);
-    
     const storeStocks = await prisma.storeStock.findMany({
       where: {
         storeId,
@@ -296,31 +293,25 @@ const getProductByStoreStock = async (storeId) => {
       },
     });
 
-    console.log(`Found ${storeStocks.length} store stocks`);
-    
     if (!storeStocks || storeStocks.length === 0) {
       throw new Error(`No store stocks found for storeId: ${storeId}`);
     }
 
     // Debug each stock to check for missing relations
-    const validStocks = storeStocks.filter(stock => {
+    const validStocks = storeStocks.filter((stock) => {
       if (!stock.batch) {
-        console.error(`StoreStock ${stock.id} has no batch`);
         return false;
       }
       if (!stock.batch.product) {
-        console.error(`StoreStock ${stock.id}, Batch ${stock.batch.id} has no product`);
         return false;
       }
       return true;
     });
 
-    console.log(`Valid stocks: ${validStocks.length}, Invalid: ${storeStocks.length - validStocks.length}`);
-
     // Return enriched data with all necessary information
     const result = validStocks.map((storeStock) => {
-      const product = storeStock.batch.product;
-      
+      const { product } = storeStock.batch;
+
       return {
         id: storeStock.id,
         storeId: storeStock.storeId,
@@ -329,14 +320,14 @@ const getProductByStoreStock = async (storeId) => {
         status: storeStock.status,
         createdAt: storeStock.createdAt,
         updatedAt: storeStock.updatedAt,
-        
+
         // Store information
         store: {
           id: storeStock.store.id,
           name: storeStock.store.name,
           branchId: storeStock.store.branchId,
         },
-        
+
         // Batch information
         batch: {
           id: storeStock.batch.id,
@@ -344,7 +335,7 @@ const getProductByStoreStock = async (storeId) => {
           expiryDate: storeStock.batch.expiryDate,
           price: storeStock.batch.price,
         },
-        
+
         // Product information with all details
         product: {
           id: product.id,
@@ -355,27 +346,25 @@ const getProductByStoreStock = async (storeId) => {
           sellPrice: product.sellPrice,
           imageUrl: product.imageUrl,
           isActive: product.isActive,
-          
+
           // Category and subcategory
           category: product.category,
           subCategory: product.subCategory,
-          
+
           // Unit of measure information from product
           unitOfMeasure: product.unitOfMeasure,
         },
-        
+
         // Unit of measure specific to this stock entry
         unitOfMeasure: storeStock.unitOfMeasure,
-        
+
         // Helper fields for frontend
         availableQuantity: storeStock.quantity, // Original quantity
         conversionFactor: storeStock.unitOfMeasure?.conversionFactor || 1,
       };
     });
 
-    console.timeEnd('getProductByStoreStock');
     return result;
-
   } catch (error) {
     console.error('Error in getProductByStoreStock:', error);
     throw error;
@@ -384,9 +373,6 @@ const getProductByStoreStock = async (storeId) => {
 
 const getProductByShopStock = async (shopId) => {
   try {
-    console.time('getProductByShopStock');
-    console.log(`Fetching shop stocks for shopId: ${shopId}`);
-    
     const shopStocks = await prisma.shopStock.findMany({
       where: {
         shopId,
@@ -408,31 +394,25 @@ const getProductByShopStock = async (shopId) => {
       },
     });
 
-    console.log(`Found ${shopStocks.length} shop stocks`);
-    
     if (!shopStocks || shopStocks.length === 0) {
       throw new Error(`No shop stocks found for shopId: ${shopId}`);
     }
 
     // Debug each stock
-    const validStocks = shopStocks.filter(stock => {
+    const validStocks = shopStocks.filter((stock) => {
       if (!stock.batch) {
-        console.error(`ShopStock ${stock.id} has no batch`);
         return false;
       }
       if (!stock.batch.product) {
-        console.error(`ShopStock ${stock.id}, Batch ${stock.batch.id} has no product`);
         return false;
       }
       return true;
     });
 
-    console.log(`Valid stocks: ${validStocks.length}, Invalid: ${shopStocks.length - validStocks.length}`);
-
     // Return enriched data with all necessary information
     const result = validStocks.map((shopStock) => {
-      const product = shopStock.batch.product;
-      
+      const { product } = shopStock.batch;
+
       return {
         id: shopStock.id,
         shopId: shopStock.shopId,
@@ -441,14 +421,14 @@ const getProductByShopStock = async (shopId) => {
         status: shopStock.status,
         createdAt: shopStock.createdAt,
         updatedAt: shopStock.updatedAt,
-        
+
         // Shop information
         shop: {
           id: shopStock.shop.id,
           name: shopStock.shop.name,
           branchId: shopStock.shop.branchId,
         },
-        
+
         // Batch information
         batch: {
           id: shopStock.batch.id,
@@ -456,7 +436,7 @@ const getProductByShopStock = async (shopId) => {
           expiryDate: shopStock.batch.expiryDate,
           price: shopStock.batch.price,
         },
-        
+
         // Product information with all details
         product: {
           id: product.id,
@@ -467,27 +447,25 @@ const getProductByShopStock = async (shopId) => {
           sellPrice: product.sellPrice,
           imageUrl: product.imageUrl,
           isActive: product.isActive,
-          
+
           // Category and subcategory
           category: product.category,
           subCategory: product.subCategory,
-          
+
           // Unit of measure information from product
           unitOfMeasure: product.unitOfMeasure,
         },
-        
+
         // Unit of measure specific to this stock entry
         unitOfMeasure: shopStock.unitOfMeasure,
-        
+
         // Helper fields for frontend
         availableQuantity: shopStock.quantity, // Original quantity
         conversionFactor: shopStock.unitOfMeasure?.conversionFactor || 1,
       };
     });
 
-    console.timeEnd('getProductByShopStock');
     return result;
-
   } catch (error) {
     console.error('Error in getProductByShopStock:', error);
     throw error;
