@@ -271,68 +271,121 @@ const updateProductBatchWithAdditionalPrices = async (batchId, updateBody) => {
 
 // Get product by store ID and stock ID
 const getProductByStoreStock = async (storeId) => {
-  const storeStocks = await prisma.storeStock.findMany({
-    where: {
-      storeId,
-    },
-    include: {
-      batch: {
-        include: {
-          product: {
-            include: {
-              category: true,
-              subCategory: true,
+  try {
+    console.time('getProductByStoreStock');
+    console.log(`Fetching store stocks for storeId: ${storeId}`);
+    
+    const storeStocks = await prisma.storeStock.findMany({
+      where: {
+        storeId,
+      },
+      include: {
+        batch: {
+          include: {
+            product: {
+              include: {
+                category: true,
+                subCategory: true,
+              },
             },
           },
         },
+        store: true,
       },
-      store: true,
-    },
-  });
+    });
 
-  if (!storeStocks || storeStocks.length === 0) {
-    throw new Error(`No store stocks found for storeId: ${storeId}`);
+    console.log(`Found ${storeStocks.length} store stocks`);
+    
+    if (!storeStocks || storeStocks.length === 0) {
+      throw new Error(`No store stocks found for storeId: ${storeId}`);
+    }
+
+    // Debug each stock to check for missing relations
+    const validStocks = storeStocks.filter(stock => {
+      if (!stock.batch) {
+        console.error(`StoreStock ${stock.id} has no batch`);
+        return false;
+      }
+      if (!stock.batch.product) {
+        console.error(`StoreStock ${stock.id}, Batch ${stock.batch.id} has no product`);
+        return false;
+      }
+      return true;
+    });
+
+    console.log(`Valid stocks: ${validStocks.length}, Invalid: ${storeStocks.length - validStocks.length}`);
+
+    const result = validStocks.map((storeStock) => ({
+      ...storeStock,
+      product: storeStock.batch.product,
+    }));
+
+    console.timeEnd('getProductByStoreStock');
+    return result;
+
+  } catch (error) {
+    console.error('Error in getProductByStoreStock:', error);
+    throw error;
   }
-
-  // Return the array directly, not wrapped in objects
-  return storeStocks.map((storeStock) => ({
-    ...storeStock,
-    product: storeStock.batch.product,
-  }));
 };
 
-// Get product by shop ID and stock ID
-// Get all products for a shop
-// Get product by shop ID and stock ID
 const getProductByShopStock = async (shopId) => {
-  const shopStocks = await prisma.shopStock.findMany({
-    where: {
-      shopId,
-    },
-    include: {
-      batch: {
-        include: {
-          product: {
-            include: {
-              category: true,
-              subCategory: true,
+  try {
+    console.time('getProductByShopStock');
+    console.log(`Fetching shop stocks for shopId: ${shopId}`);
+    
+    const shopStocks = await prisma.shopStock.findMany({
+      where: {
+        shopId,
+      },
+      include: {
+        batch: {
+          include: {
+            product: {
+              include: {
+                category: true,
+                subCategory: true,
+              },
             },
           },
         },
+        shop: true,
       },
-      shop: true,
-    },
-  });
+    });
 
-  if (!shopStocks || shopStocks.length === 0) {
-    throw new Error(`No shop stocks found for shopId: ${shopId}`);
+    console.log(`Found ${shopStocks.length} shop stocks`);
+    
+    if (!shopStocks || shopStocks.length === 0) {
+      throw new Error(`No shop stocks found for shopId: ${shopId}`);
+    }
+
+    // Debug each stock
+    const validStocks = shopStocks.filter(stock => {
+      if (!stock.batch) {
+        console.error(`ShopStock ${stock.id} has no batch`);
+        return false;
+      }
+      if (!stock.batch.product) {
+        console.error(`ShopStock ${stock.id}, Batch ${stock.batch.id} has no product`);
+        return false;
+      }
+      return true;
+    });
+
+    console.log(`Valid stocks: ${validStocks.length}, Invalid: ${shopStocks.length - validStocks.length}`);
+
+    const result = validStocks.map((shopStock) => ({
+      ...shopStock,
+      product: shopStock.batch.product,
+    }));
+
+    console.timeEnd('getProductByShopStock');
+    return result;
+
+  } catch (error) {
+    console.error('Error in getProductByShopStock:', error);
+    throw error;
   }
-
-  // Return the array directly, not wrapped in objects
-  return shopStocks.map((shopStock) => ({
-    ...shopStock,
-    product: shopStock.batch.product,
-  }));
 };
 const getProductInfoByBatchId = async (batchId) => {
   const batch = await prisma.productBatch.findUnique({
