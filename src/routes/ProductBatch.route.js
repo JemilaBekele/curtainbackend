@@ -38,16 +38,13 @@ router.get(
 );
 
 router.get(
-  '/api/find/store/:storeId/stock/product',
-  auth,
-  // cmheckPermission('VIEW_PRODUCT_BY_STORE_STOCK'),
+  '/api/find/store/:storeId/stock/product', // cmheckPermission('VIEW_PRODUCT_BY_STORE_STOCK'),
   productBatchController.getProductByStoreStock,
 );
 
 // ✅ Get product by shop stock
 router.get(
   '/api/find/shop/:shopId/stock/product',
-  auth,
   // checkPermission('VIEW_PRODUCT_BY_SHOP_STOCK'),
   productBatchController.getProductByShopStock,
 );
