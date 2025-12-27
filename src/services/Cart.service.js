@@ -746,6 +746,8 @@ const removeItemFromCart = async (cartItemId) => {
 };
 const assignCustomerToCart = async (cartId, customerId, discount, notes) => {
   try {
+    // DEBUGGING: Log all input parameters
+
     // Validate inputs
     if (!cartId) {
       throw new ApiError(
@@ -812,6 +814,8 @@ const assignCustomerToCart = async (cartId, customerId, discount, notes) => {
 
     // Add discount if provided
     if (normalizedDiscount !== undefined) {
+      // DEBUGGING: More detailed logging
+
       if (isNaN(normalizedDiscount)) {
         throw new ApiError(
           httpStatus.BAD_REQUEST,
@@ -826,13 +830,20 @@ const assignCustomerToCart = async (cartId, customerId, discount, notes) => {
         );
       }
 
-      // Optional: Add maximum discount validation
-      if (normalizedDiscount > 100) {
-        // Assuming percentage discount
+      // IMPORTANT: If discount is absolute value, validate it doesn't exceed total amount
+      // (unless you want to allow negative final amounts)
+      if (normalizedDiscount > cart.totalAmount) {
+        // Business decision: Either reject or cap at total amount
+
+        // Option 1: Reject (safer)
         throw new ApiError(
           httpStatus.BAD_REQUEST,
-          'Discount cannot exceed 100%',
+          `Discount (${normalizedDiscount}) cannot exceed cart total amount (${cart.totalAmount})`,
         );
+
+        // Option 2: Cap at total amount
+        // normalizedDiscount = cart.totalAmount;
+        // console.log('Capped discount at total amount:', cart.totalAmount);
       }
 
       updateData.discount = normalizedDiscount;
@@ -842,6 +853,8 @@ const assignCustomerToCart = async (cartId, customerId, discount, notes) => {
     if (normalizedNotes !== undefined) {
       updateData.notes = normalizedNotes;
     }
+
+    // DEBUGGING: Log the update data before sending to Prisma
 
     // Update cart
     const updatedCart = await prisma.addToCart.update({
@@ -858,8 +871,12 @@ const assignCustomerToCart = async (cartId, customerId, discount, notes) => {
       },
     });
 
+    // Calculate final amount for logging
+
     return updatedCart;
   } catch (error) {
+    // ADDED CONSOLE.LOG HERE TO SEE THE ERROR
+
     if (error instanceof ApiError) {
       throw error;
     }
@@ -875,9 +892,6 @@ const assignCustomerToCart = async (cartId, customerId, discount, notes) => {
         'Foreign key constraint failed',
       );
     }
-
-    // Log unexpected errors for debugging
-    console.error('Error assigning customer to cart:', error);
 
     throw new ApiError(
       httpStatus.INTERNAL_SERVER_ERROR,
@@ -1164,7 +1178,7 @@ const convertOrderToCart = async (sellId, userId) => {
         const cartData = {
           userId,
           branchId: user.branchId,
-          customerId: sell.customerId,
+          // customerId: sell.customerId,
           totalItems: sell.totalProducts,
           totalAmount: sell.grandTotal,
           isCheckedOut: false,
@@ -1314,7 +1328,6 @@ const convertOrderToCart = async (sellId, userId) => {
 // Update the service function signature
 const addToWaitlist = async (data, userId) => {
   const { cartItemIds, note } = data;
-  console.log('addToWaitlist called with:', data);
 
   // Validate input
   if (!cartItemIds || !Array.isArray(cartItemIds) || cartItemIds.length === 0) {

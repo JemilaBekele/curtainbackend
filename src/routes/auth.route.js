@@ -73,8 +73,18 @@ router.get(
 // Authentication route
 router.post(
   '/api/login',
-  // validate(userValidation.loginSchema),
+  // validate(userValidation.loginSchema),  , Saleslogin,
   authController.login,
+);
+router.post(
+  '/api/login/Sales/only',
+  // validate(userValidation.loginSchema),  , ,
+  authController.Saleslogin,
+);
+router.post(
+  '/api/login/Store/only',
+  // validate(userValidation.loginSchema),  Storelogin, Saleslogin,
+  authController.Storelogin,
 );
 router.put(
   '/api/user/reset-password/:userId',

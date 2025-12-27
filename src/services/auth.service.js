@@ -104,7 +104,190 @@ const login = async (email, password, ipAddr) => {
 
   return formattedUser;
 };
+const Storelogin = async (email, password, ipAddr) => {
+  // Rate limiting logic
+  const rateLimiterOptions = {
+    blockDuration: 60 * 60 * 24, // Block for 1 day
+  };
 
+  const emailIpBruteLimiter = new RateLimiterMemory({
+    ...rateLimiterOptions,
+    points: config.rateLimiter.maxAttemptsByIpUsername,
+    duration: 60 * 10, // 10 minutes
+  });
+
+  const slowerBruteLimiter = new RateLimiterMemory({
+    ...rateLimiterOptions,
+    points: config.rateLimiter.maxAttemptsPerDay,
+    duration: 60 * 60 * 24,
+  });
+
+  const emailBruteLimiter = new RateLimiterMemory({
+    ...rateLimiterOptions,
+    points: config.rateLimiter.maxAttemptsPerEmail,
+    duration: 60 * 60 * 24,
+  });
+
+  const promises = [slowerBruteLimiter.consume(ipAddr)];
+
+  // Find user with role, permissions, and branch
+  const user = await prisma.user.findUnique({
+    where: { email },
+    include: {
+      role: {
+        include: {
+          permissions: {
+            include: {
+              permission: true,
+            },
+          },
+        },
+      },
+      branch: true,
+      shops: true,
+      stores: true,
+    },
+  });
+
+  // Check if user exists and password matches
+  if (!user || !(await userService.isPasswordMatch(user, password))) {
+    if (user) {
+      promises.push(
+        emailIpBruteLimiter.consume(`${email}_${ipAddr}`),
+        emailBruteLimiter.consume(email),
+      );
+    }
+    await Promise.all(promises);
+    throw new ApiError(httpStatus.UNAUTHORIZED, 'Incorrect email or password');
+  }
+  // NEW: Only allow admin or roles containing "store" (case-insensitive)
+  const roleName = user.role?.name?.toLowerCase() || '';
+  const isAdmin = user.admin === true || roleName.includes('admin');
+  const hasStoreRole = roleName.includes('store');
+
+  if (!isAdmin && !hasStoreRole) {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      'Access denied. Only administrators and store personnel can login through this portal.',
+    );
+  }
+
+  // Format the user object with permission names only and branch info
+  const formattedUser = {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    admin: user.admin,
+    roleType: user.roleType,
+    role: user.role?.name,
+    lastLoginAt: user.lastLoginAt,
+    status: user.status,
+    phone: user.phone,
+    branch: user?.branch,
+    shops: user.shops,
+    stores: user.stores,
+  };
+
+  // Update last login time
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { lastLoginAt: new Date() },
+  });
+
+  return formattedUser;
+};
+const Saleslogin = async (email, password, ipAddr) => {
+  // Rate limiting logic
+  const rateLimiterOptions = {
+    blockDuration: 60 * 60 * 24, // Block for 1 day
+  };
+
+  const emailIpBruteLimiter = new RateLimiterMemory({
+    ...rateLimiterOptions,
+    points: config.rateLimiter.maxAttemptsByIpUsername,
+    duration: 60 * 10, // 10 minutes
+  });
+
+  const slowerBruteLimiter = new RateLimiterMemory({
+    ...rateLimiterOptions,
+    points: config.rateLimiter.maxAttemptsPerDay,
+    duration: 60 * 60 * 24,
+  });
+
+  const emailBruteLimiter = new RateLimiterMemory({
+    ...rateLimiterOptions,
+    points: config.rateLimiter.maxAttemptsPerEmail,
+    duration: 60 * 60 * 24,
+  });
+
+  const promises = [slowerBruteLimiter.consume(ipAddr)];
+
+  // Find user with role, permissions, and branch
+  const user = await prisma.user.findUnique({
+    where: { email },
+    include: {
+      role: {
+        include: {
+          permissions: {
+            include: {
+              permission: true,
+            },
+          },
+        },
+      },
+      branch: true,
+      shops: true,
+      stores: true,
+    },
+  });
+
+  // Check if user exists and password matches
+  if (!user || !(await userService.isPasswordMatch(user, password))) {
+    if (user) {
+      promises.push(
+        emailIpBruteLimiter.consume(`${email}_${ipAddr}`),
+        emailBruteLimiter.consume(email),
+      );
+    }
+    await Promise.all(promises);
+    throw new ApiError(httpStatus.UNAUTHORIZED, 'Incorrect email or password');
+  }
+  // NEW: Only allow admin or roles containing "store" (case-insensitive)
+  const roleName = user.role?.name?.toLowerCase() || '';
+  const isAdmin = user.admin === true || roleName.includes('admin');
+  const hasStoreRole = roleName.includes('sales');
+
+  if (!isAdmin && !hasStoreRole) {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      'Access denied. Only administrators and store personnel can login through this portal.',
+    );
+  }
+
+  // Format the user object with permission names only and branch info
+  const formattedUser = {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    admin: user.admin,
+    roleType: user.roleType,
+    role: user.role?.name,
+    lastLoginAt: user.lastLoginAt,
+    status: user.status,
+    phone: user.phone,
+    branch: user?.branch,
+    shops: user.shops,
+    stores: user.stores,
+  };
+
+  // Update last login time
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { lastLoginAt: new Date() },
+  });
+
+  return formattedUser;
+};
 /**
  * Refresh auth tokens
  * Requires a valid refresh token. Generates a new access and refresh token pair.
@@ -144,5 +327,7 @@ const refreshAuthToken = async (refreshToken) => {
 module.exports = {
   login,
   refreshAuthToken,
+  Storelogin,
+  Saleslogin,
   // ... add other exported functions like logout, sendEmailVerificationToken, etc.
 };

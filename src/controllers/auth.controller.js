@@ -66,7 +66,29 @@ const login = catchAsync(async (req, res) => {
     password,
     req.connection.remoteAddress,
   );
-  // generate token
+  // generate token ,Saleslogin,
+  const tokens = await tokenService.generateAuthTokens(user.id);
+  res.status(httpStatus.OK).send({ user, tokens });
+});
+const Storelogin = catchAsync(async (req, res) => {
+  const { email, password } = req.body;
+  const user = await authService.Storelogin(
+    email,
+    password,
+    req.connection.remoteAddress,
+  );
+  // generate token Storelogin,,
+  const tokens = await tokenService.generateAuthTokens(user.id);
+  res.status(httpStatus.OK).send({ user, tokens });
+});
+const Saleslogin = catchAsync(async (req, res) => {
+  const { email, password } = req.body;
+  const user = await authService.Saleslogin(
+    email,
+    password,
+    req.connection.remoteAddress,
+  );
+  // generate token Storelogin,Saleslogin,
   const tokens = await tokenService.generateAuthTokens(user.id);
   res.status(httpStatus.OK).send({ user, tokens });
 });
@@ -119,4 +141,6 @@ module.exports = {
   changeUserPassword,
   getUsermy,
   resetPassword,
+  Storelogin,
+  Saleslogin,
 };

@@ -1812,16 +1812,12 @@ const cancelSale = async (saleId, userId) => {
 
         // Remove 'shop:' prefix to match frontend
         io.to(shopId).emit('new-notification', notification);
-        console.log(`✅ Sent real-time notification to shop ${shopId}`);
       });
 
     // Send real-time notifications to users with shop access
     usersWithShopAccess.forEach((user) => {
       // Send to each user individually - remove 'user:' prefix
       io.to(user.id).emit('new-notification', realTimeNotification);
-      console.log(
-        `✅ Sent real-time notification to user ${user.name} (${user.id})`,
-      );
 
       // Also send to user's shops for additional targeting
       user.shops.forEach((shop) => {
@@ -1856,7 +1852,7 @@ const getAllSellsuser = async ({
   endDate,
   userId,
   customerName,
-  status,
+  status, // This parameter should actually be called saleStatus for clarity
   page = 1,
   limit = 20,
 }) => {
@@ -1869,8 +1865,7 @@ const getAllSellsuser = async ({
   const whereClause = {
     createdById: userId,
   };
-
-  // Add status filter if provided
+  // Fix: Use saleStatus instead of status
   if (status) {
     // Handle multiple statuses (comma-separated) or single status
     if (status.includes(',')) {
@@ -1879,10 +1874,12 @@ const getAllSellsuser = async ({
         .map((s) => s.trim())
         .filter((s) => s);
       if (statuses.length > 0) {
-        whereClause.status = { in: statuses };
+        // Fix: Use saleStatus field name
+        whereClause.saleStatus = { in: statuses };
       }
     } else {
-      whereClause.status = status;
+      // Fix: Use saleStatus field name
+      whereClause.saleStatus = status;
     }
   }
 
@@ -1933,7 +1930,7 @@ const getAllSellsuser = async ({
     } else {
       // No dates provided, default to last 12 months
       const twelveMonthsAgo = new Date();
-      twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+      twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 2);
       whereClause.createdAt = { gte: twelveMonthsAgo };
     }
   } catch (error) {
@@ -1943,8 +1940,57 @@ const getAllSellsuser = async ({
   // Calculate pagination
   const skip = (page - 1) * limit;
 
+  // Check available saleStatus values in database
+  try {
+    // Fix: Use the correct field name and enum values
+    const distinctSaleStatuses = await prisma.sell.findMany({
+      where: {
+        createdById: userId,
+        createdAt: whereClause.createdAt,
+      },
+      distinct: ['saleStatus'], // Fix: Use 'saleStatus' instead of 'status'
+      select: {
+        saleStatus: true, // Fix: Select saleStatus field
+      },
+    });
+
+    // Also check counts for each status
+    const statusCounts = await Promise.all(
+      distinctSaleStatuses.map(async (item) => {
+        const count = await prisma.sell.count({
+          where: {
+            createdById: userId,
+            saleStatus: item.saleStatus, // Fix: Use saleStatus
+            createdAt: whereClause.createdAt,
+          },
+        });
+        return { status: item.saleStatus, count };
+      }),
+    );
+
+    // Check specifically for the requested status
+    if (status) {
+      const requestedStatusCount = await prisma.sell.count({
+        where: {
+          createdById: userId,
+          saleStatus: status.includes(',')
+            ? {
+                in: status
+                  .split(',')
+                  .map((s) => s.trim())
+                  .filter((s) => s),
+              }
+            : status,
+          createdAt: whereClause.createdAt,
+        },
+      });
+    }
+  } catch (error) {
+    console.log('   Error checking saleStatuses:', error.message);
+  }
+
   // Execute the query with pagination
-  const [sells] = await Promise.all([
+  const [sells, totalCount] = await Promise.all([
     prisma.sell.findMany({
       where: whereClause,
       orderBy: { createdAt: 'desc' },
@@ -2001,6 +2047,8 @@ const getAllSellsuser = async ({
   let filteredSells = sells;
   if (customerName && customerName.trim()) {
     const customerNameLower = customerName.trim().toLowerCase();
+
+    const beforeFilterCount = filteredSells.length;
     filteredSells = sells.filter(
       (sell) =>
         sell.customer &&
@@ -2012,6 +2060,7 @@ const getAllSellsuser = async ({
   return {
     sells: filteredSells,
     count: filteredSells.length,
+    totalCount,
   };
 };
 
