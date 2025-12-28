@@ -50,7 +50,7 @@ class InventoryDashboardService {
     }
   }
 
-  static async _getExpiringBatches(tx, days = 365) { // Changed from 30 to 365 days (1 year)
+  static async _getExpiringBatches(tx, days = 365) {
     try {
       const now = new Date();
       const expiryDate = new Date();
@@ -66,8 +66,7 @@ class InventoryDashboardService {
         p.name as productName,
         p.productCode,
         c.name as categoryName,
-        COALESCE(store_stock.total_qty, 0) + COALESCE(shop_stock.total_qty, 0) as totalQuantity,
-        DATEDIFF(pb.expiryDate, NOW()) as daysUntilExpiry
+        COALESCE(store_stock.total_qty, 0) + COALESCE(shop_stock.total_qty, 0) as totalQuantity
       FROM product_batches pb
       INNER JOIN products p ON pb.productId = p._id
       INNER JOIN categories c ON p.categoryId = c._id
@@ -90,7 +89,15 @@ class InventoryDashboardService {
       ORDER BY pb.expiryDate ASC
     `;
 
-      return result;
+      // Calculate days until expiry in JavaScript for better compatibility
+      const formattedResult = result.map(item => ({
+        ...item,
+        daysUntilExpiry: item.expiryDate 
+          ? Math.ceil((new Date(item.expiryDate) - new Date()) / (1000 * 60 * 60 * 24))
+          : null
+      }));
+
+      return formattedResult;
     } catch (error) {
       console.error(
         '❌ _getExpiringBatches failed:',
@@ -111,16 +118,7 @@ class InventoryDashboardService {
         pb.batchNumber,
         pb.warningQuantity,
         COALESCE(store_stock.total_qty, 0) + COALESCE(shop_stock.total_qty, 0) as currentStock,
-        c.name as categoryName,
-        CASE 
-          WHEN (COALESCE(store_stock.total_qty, 0) + COALESCE(shop_stock.total_qty, 0)) = 0 THEN 'OUT_OF_STOCK'
-          ELSE 'LOW_STOCK'
-        END as alertType,
-        ROUND(
-          ((COALESCE(store_stock.total_qty, 0) + COALESCE(shop_stock.total_qty, 0)) * 100.0) / 
-          NULLIF(pb.warningQuantity, 0), 
-          2
-        ) as stockPercentage
+        c.name as categoryName
       FROM products p
       INNER JOIN product_batches pb ON p._id = pb.productId
       INNER JOIN categories c ON p.categoryId = c._id
@@ -151,7 +149,21 @@ class InventoryDashboardService {
         pb.warningQuantity DESC
     `;
 
-      return result;
+      // Calculate alert type and percentage in JavaScript for better compatibility
+      const formattedResult = result.map(item => {
+        const alertType = item.currentStock === 0 ? 'OUT_OF_STOCK' : 'LOW_STOCK';
+        const stockPercentage = item.warningQuantity > 0 
+          ? Math.round((item.currentStock * 100.0) / item.warningQuantity * 100) / 100
+          : 0;
+
+        return {
+          ...item,
+          alertType,
+          stockPercentage
+        };
+      });
+
+      return formattedResult;
     } catch (error) {
       console.error(
         '❌ _getLowStockAlerts failed:',
@@ -207,6 +219,8 @@ class InventoryDashboardService {
 
   static async _getInventoryAgingReport(tx) {
     try {
+      // First, let's check what database functions are available
+      // Use a simpler approach that works across databases
       const result = await tx.$queryRaw`
       SELECT 
         p._id,
@@ -215,7 +229,7 @@ class InventoryDashboardService {
         pb.batchNumber,
         pb.createdAt as batchDate,
         COALESCE(SUM(store_stock.total_qty), 0) + COALESCE(SUM(shop_stock.total_qty), 0) as quantity,
-        DATEDIFF(NOW(), pb.createdAt) as daysInInventory,
+        pb.createdAt,
         SUM(pb.price * (COALESCE(store_stock.total_qty, 0) + COALESCE(shop_stock.total_qty, 0))) as inventoryValue,
         c.name as categoryName
       FROM product_batches pb
@@ -235,13 +249,41 @@ class InventoryDashboardService {
       ) as shop_stock ON pb._id = shop_stock.batchId
       WHERE (COALESCE(store_stock.total_qty, 0) + COALESCE(shop_stock.total_qty, 0)) > 0
       GROUP BY p._id, p.name, p.productCode, pb.batchNumber, pb.createdAt, c.name
-      ORDER BY daysInInventory DESC
+      ORDER BY pb.createdAt ASC
     `;
 
-      console.log('✅ _getInventoryAgingReport success:', {
-        recordCount: result?.length,
+      // Calculate days in inventory in JavaScript for better compatibility
+      const now = new Date();
+      const formattedResult = result.map(item => {
+        const batchDate = new Date(item.batchDate);
+        const daysInInventory = Math.floor((now - batchDate) / (1000 * 60 * 60 * 24));
+        
+        return {
+          id: item._id,
+          productName: item.productName,
+          productCode: item.productCode,
+          batchNumber: item.batchNumber,
+          batchDate: item.batchDate,
+          quantity: item.quantity,
+          daysInInventory: daysInInventory >= 0 ? daysInInventory : 0,
+          inventoryValue: item.inventoryValue,
+          categoryName: item.categoryName
+        };
       });
-      return result;
+
+      // Sort by days in inventory descending (oldest first)
+      formattedResult.sort((a, b) => b.daysInInventory - a.daysInInventory);
+
+      console.log('✅ _getInventoryAgingReport success:', {
+        recordCount: formattedResult?.length,
+        sampleDates: formattedResult.slice(0, 3).map(r => ({
+          product: r.productName,
+          batchDate: r.batchDate,
+          days: r.daysInInventory
+        }))
+      });
+
+      return formattedResult;
     } catch (error) {
       console.error(
         '❌ _getInventoryAgingReport failed:',
