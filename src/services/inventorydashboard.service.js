@@ -50,8 +50,9 @@ class InventoryDashboardService {
     }
   }
 
-  static async _getExpiringBatches(tx, days = 30) {
+  static async _getExpiringBatches(tx, days = 365) { // Changed from 30 to 365 days (1 year)
     try {
+      const now = new Date();
       const expiryDate = new Date();
       expiryDate.setDate(expiryDate.getDate() + days);
 
@@ -65,7 +66,8 @@ class InventoryDashboardService {
         p.name as productName,
         p.productCode,
         c.name as categoryName,
-        COALESCE(store_stock.total_qty, 0) + COALESCE(shop_stock.total_qty, 0) as totalQuantity
+        COALESCE(store_stock.total_qty, 0) + COALESCE(shop_stock.total_qty, 0) as totalQuantity,
+        DATEDIFF(pb.expiryDate, NOW()) as daysUntilExpiry
       FROM product_batches pb
       INNER JOIN products p ON pb.productId = p._id
       INNER JOIN categories c ON p.categoryId = c._id
@@ -81,7 +83,8 @@ class InventoryDashboardService {
         WHERE status = 'Available'
         GROUP BY batchId
       ) as shop_stock ON pb._id = shop_stock.batchId
-      WHERE pb.expiryDate BETWEEN ${new Date()} AND ${expiryDate}
+      WHERE pb.expiryDate IS NOT NULL
+        AND pb.expiryDate BETWEEN ${now} AND ${expiryDate}
         AND (COALESCE(store_stock.total_qty, 0) + COALESCE(shop_stock.total_qty, 0)) > 0
       GROUP BY pb._id, pb.batchNumber, pb.expiryDate, pb.price, p.sellPrice, p.name, p.productCode, c.name
       ORDER BY pb.expiryDate ASC
@@ -108,7 +111,16 @@ class InventoryDashboardService {
         pb.batchNumber,
         pb.warningQuantity,
         COALESCE(store_stock.total_qty, 0) + COALESCE(shop_stock.total_qty, 0) as currentStock,
-        c.name as categoryName
+        c.name as categoryName,
+        CASE 
+          WHEN (COALESCE(store_stock.total_qty, 0) + COALESCE(shop_stock.total_qty, 0)) = 0 THEN 'OUT_OF_STOCK'
+          ELSE 'LOW_STOCK'
+        END as alertType,
+        ROUND(
+          ((COALESCE(store_stock.total_qty, 0) + COALESCE(shop_stock.total_qty, 0)) * 100.0) / 
+          NULLIF(pb.warningQuantity, 0), 
+          2
+        ) as stockPercentage
       FROM products p
       INNER JOIN product_batches pb ON p._id = pb.productId
       INNER JOIN categories c ON p.categoryId = c._id
@@ -125,10 +137,18 @@ class InventoryDashboardService {
         GROUP BY batchId
       ) as shop_stock ON pb._id = shop_stock.batchId
       WHERE pb.warningQuantity IS NOT NULL 
-        AND (COALESCE(store_stock.total_qty, 0) + COALESCE(shop_stock.total_qty, 0)) < pb.warningQuantity
-        AND (COALESCE(store_stock.total_qty, 0) + COALESCE(shop_stock.total_qty, 0)) > 0
+        AND pb.warningQuantity > 0
+        AND (
+          (COALESCE(store_stock.total_qty, 0) + COALESCE(shop_stock.total_qty, 0)) <= pb.warningQuantity
+          OR (COALESCE(store_stock.total_qty, 0) + COALESCE(shop_stock.total_qty, 0)) = 0
+        )
       GROUP BY p._id, p.name, p.productCode, pb.batchNumber, pb.warningQuantity, c.name
-      ORDER BY (COALESCE(store_stock.total_qty, 0) + COALESCE(shop_stock.total_qty, 0)) / pb.warningQuantity ASC
+      ORDER BY 
+        CASE 
+          WHEN (COALESCE(store_stock.total_qty, 0) + COALESCE(shop_stock.total_qty, 0)) = 0 THEN 0
+          ELSE (COALESCE(store_stock.total_qty, 0) + COALESCE(shop_stock.total_qty, 0)) / pb.warningQuantity
+        END ASC,
+        pb.warningQuantity DESC
     `;
 
       return result;
