@@ -166,39 +166,39 @@ class InventoryDashboardService {
   static async _getTopItemsByValue(tx, limit = 10) {
     try {
       const result = await tx.$queryRaw`
-      SELECT 
-        p._id,
-        p.name as productName,
-        p.productCode,
-        c.name as category,
-        SUM(COALESCE(store_stock.total_qty, 0) + COALESCE(shop_stock.total_qty, 0)) as totalQuantity,
-        SUM(pb.price * (COALESCE(store_stock.total_qty, 0) + COALESCE(shop_stock.total_qty, 0))) as totalCostValue,
-        SUM(p.sellPrice * (COALESCE(store_stock.total_qty, 0) + COALESCE(shop_stock.total_qty, 0))) as totalRetailValue
-      FROM products p
-      INNER JOIN categories c ON p.categoryId = c._id
-      INNER JOIN product_batches pb ON p._id = pb.productId
-      LEFT JOIN (
-        SELECT batchId, SUM(quantity) as total_qty 
-        FROM store_stocks 
-        WHERE status = 'Available'
-        GROUP BY batchId
-      ) as store_stock ON pb._id = store_stock.batchId
-      LEFT JOIN (
-        SELECT batchId, SUM(quantity) as total_qty 
-        FROM shop_stocks 
-        WHERE status = 'Available'
-        GROUP BY batchId
-      ) as shop_stock ON pb._id = shop_stock.batchId
-      WHERE (COALESCE(store_stock.total_qty, 0) + COALESCE(shop_stock.total_qty, 0)) > 0
-      GROUP BY p._id, p.name, p.productCode, c.name
-      ORDER BY totalCostValue DESC
-      LIMIT ${limit}
-    `;
+    SELECT 
+      p._id,
+      p.name as productName,
+      p.productCode,
+      c.name as category,
+      SUM(COALESCE(store_stock.total_qty, 0) + COALESCE(shop_stock.total_qty, 0)) as totalQuantity,
+      SUM(pb.price * (COALESCE(store_stock.total_qty, 0) + COALESCE(shop_stock.total_qty, 0))) as totalCostValue,
+      SUM(p.sellPrice * (COALESCE(store_stock.total_qty, 0) + COALESCE(shop_stock.total_qty, 0))) as totalRetailValue
+    FROM products p
+    INNER JOIN categories c ON p.categoryId = c._id
+    INNER JOIN product_batches pb ON p._id = pb.productId
+    LEFT JOIN (
+      SELECT batchId, SUM(quantity) as total_qty 
+      FROM store_stocks 
+      WHERE status = 'Available'
+      GROUP BY batchId
+    ) as store_stock ON pb._id = store_stock.batchId
+    LEFT JOIN (
+      SELECT batchId, SUM(quantity) as total_qty 
+      FROM shop_stocks 
+      WHERE status = 'Available'
+      GROUP BY batchId
+    ) as shop_stock ON pb._id = shop_stock.batchId
+    WHERE (COALESCE(store_stock.total_qty, 0) + COALESCE(shop_stock.total_qty, 0)) > 0
+    GROUP BY p._id, p.name, p.productCode, c.name
+    ORDER BY totalQuantity DESC  -- Changed from totalCostValue to totalQuantity
+    LIMIT ${limit}
+  `;
 
       return result;
     } catch (error) {
       console.error(
-        '❌ _getTopItemsByValue failed:',
+        '❌ _getTopItemsByQuantity failed:',
         error.message,
         error.stack,
       );
