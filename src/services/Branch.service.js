@@ -96,7 +96,7 @@ const deleteBranch = async (id) => {
   return { message: 'Branch deleted successfully' };
 };
 
-const getAllProducts = async (userId = null) => {
+const getAllProducts = async (userId) => {
   // First, get user with shop access if userId is provided
   let userShops = [];
   if (userId) {
