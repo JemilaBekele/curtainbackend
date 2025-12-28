@@ -198,7 +198,6 @@ const Storelogin = async (email, password, ipAddr) => {
 };
 const Saleslogin = async (email, password, ipAddr) => {
   // Rate limiting logic
-  console.log(email, password);
   const rateLimiterOptions = {
     blockDuration: 60 * 60 * 24, // Block for 1 day
   };

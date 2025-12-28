@@ -97,8 +97,10 @@ const deleteBranch = async (id) => {
 };
 
 const getAllProducts = async (userId) => {
-  // First, get user with shop access if userId is provided
+  // First, get user with shop and store access if userId is provided
   let userShops = [];
+  let userStores = [];
+
   if (userId) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -110,9 +112,17 @@ const getAllProducts = async (userId) => {
             },
           },
         },
+        stores: {
+          include: {
+            branch: {
+              select: { id: true, name: true },
+            },
+          },
+        },
       },
     });
     userShops = user?.shops || [];
+    userStores = user?.stores || [];
   }
 
   // Get all branches, shops, and stores with their relationships
@@ -143,21 +153,37 @@ const getAllProducts = async (userId) => {
   const shopMap = Object.fromEntries(shops.map((shop) => [shop.id, shop]));
   const storeMap = Object.fromEntries(stores.map((store) => [store.id, store]));
 
-  // Build where clause based on user shop access
+  // Get user's accessible shop and store IDs
+  const userShopIds = userShops.map((shop) => shop.id);
+  const userStoreIds = userStores.map((store) => store.id);
+
+  // Build where clause based on user shop AND store access
   const whereClause =
-    userId && userShops.length > 0
+    userId && (userShopIds.length > 0 || userStoreIds.length > 0)
       ? {
           OR: [
             // Include products that have stock in user's accessible shops
             {
               batches: {
                 some: {
-                  ShopStock: {
-                    some: {
-                      shopId: { in: userShops.map((shop) => shop.id) },
-                      status: 'Available',
+                  OR: [
+                    {
+                      ShopStock: {
+                        some: {
+                          shopId: { in: userShopIds },
+                          status: 'Available',
+                        },
+                      },
                     },
-                  },
+                    {
+                      StoreStock: {
+                        some: {
+                          storeId: { in: userStoreIds },
+                          status: 'Available',
+                        },
+                      },
+                    },
+                  ],
                 },
               },
             },
@@ -165,7 +191,15 @@ const getAllProducts = async (userId) => {
             {
               AdditionalPrice: {
                 some: {
-                  shopId: { in: userShops.map((shop) => shop.id) },
+                  shopId: { in: userShopIds },
+                },
+              },
+            },
+            // Include products that are in batches assigned to user's accessible stores
+            {
+              batches: {
+                some: {
+                  storeId: { in: userStoreIds },
                 },
               },
             },
@@ -195,6 +229,28 @@ const getAllProducts = async (userId) => {
         },
       },
       batches: {
+        where:
+          userId && (userShopIds.length > 0 || userStoreIds.length > 0)
+            ? {
+                OR: [
+                  { storeId: { in: userStoreIds } },
+                  {
+                    ShopStock: {
+                      some: {
+                        shopId: { in: userShopIds },
+                      },
+                    },
+                  },
+                  {
+                    StoreStock: {
+                      some: {
+                        storeId: { in: userStoreIds },
+                      },
+                    },
+                  },
+                ],
+              }
+            : {},
         include: {
           ShopStock: {
             where: { status: 'Available' },
@@ -244,22 +300,36 @@ const getAllProducts = async (userId) => {
         totalBranchStock: 0,
       };
 
-      // Initialize shops for this branch
+      // Initialize shops for this branch (filtered by user access if applicable)
       shops
         .filter((shop) => shop.branchId === branch.id)
         .forEach((shop) => {
-          branchStocks[branch.name].shops[shop.name] = 0;
+          if (userId && userShopIds.length > 0) {
+            // Only include shops accessible to user
+            if (userShopIds.includes(shop.id)) {
+              branchStocks[branch.name].shops[shop.name] = 0;
+            }
+          } else {
+            branchStocks[branch.name].shops[shop.name] = 0;
+          }
         });
 
-      // Initialize stores for this branch
+      // Initialize stores for this branch (filtered by user access if applicable)
       stores
         .filter((store) => store.branchId === branch.id)
         .forEach((store) => {
-          branchStocks[branch.name].stores[store.name] = 0;
+          if (userId && userStoreIds.length > 0) {
+            // Only include stores accessible to user
+            if (userStoreIds.includes(store.id)) {
+              branchStocks[branch.name].stores[store.name] = 0;
+            }
+          } else {
+            branchStocks[branch.name].stores[store.name] = 0;
+          }
         });
     });
 
-    // Calculate stock from all batches
+    // Calculate stock from all batches (filtered by user access)
     product.batches.forEach((batch) => {
       const batchBranchStocks = {};
       let batchTotalStock = 0;
@@ -273,11 +343,20 @@ const getAllProducts = async (userId) => {
         };
       });
 
-      // Process shop stock for this batch
+      // Process shop stock for this batch (filtered by user access)
       batch.ShopStock.forEach((shopStock) => {
         const { shop } = shopStock;
         const branchName = shop.branch.name;
         const { quantity } = shopStock;
+
+        // Only include if user has access to this shop
+        if (
+          userId &&
+          userShopIds.length > 0 &&
+          !userShopIds.includes(shop.id)
+        ) {
+          return;
+        }
 
         // Update main branch stocks
         branchStocks[branchName].shops[shop.name] =
@@ -294,11 +373,20 @@ const getAllProducts = async (userId) => {
         batchTotalStock += quantity;
       });
 
-      // Process store stock for this batch
+      // Process store stock for this batch (filtered by user access)
       batch.StoreStock.forEach((storeStock) => {
         const { store } = storeStock;
         const branchName = store.branch.name;
         const { quantity } = storeStock;
+
+        // Only include if user has access to this store
+        if (
+          userId &&
+          userStoreIds.length > 0 &&
+          !userStoreIds.includes(store.id)
+        ) {
+          return;
+        }
 
         // Update main branch stocks
         branchStocks[branchName].stores[store.name] =
@@ -315,26 +403,26 @@ const getAllProducts = async (userId) => {
         batchTotalStock += quantity;
       });
 
-      // Add batch stock details
-      batchStockDetails.push({
-        batchId: batch.id,
-        batchNumber: batch.batchNumber,
-        expiryDate: batch.expiryDate,
-        price: batch.price,
-        branchStocks: batchBranchStocks,
-        totalStock: batchTotalStock,
-      });
+      // Only add batch stock details if there's actual stock in accessible locations
+      if (batchTotalStock > 0) {
+        batchStockDetails.push({
+          batchId: batch.id,
+          batchNumber: batch.batchNumber,
+          expiryDate: batch.expiryDate,
+          price: batch.price,
+          branchStocks: batchBranchStocks,
+          totalStock: batchTotalStock,
+        });
+      }
     });
 
     const totalStock = totalShopStock + totalStoreStock;
 
     // Filter additional prices based on user shop access
     const filteredAdditionalPrices =
-      userId && userShops.length > 0
+      userId && userShopIds.length > 0
         ? product.AdditionalPrice.filter(
-            (price) =>
-              !price.shopId ||
-              userShops.some((shop) => shop.id === price.shopId),
+            (price) => !price.shopId || userShopIds.includes(price.shopId),
           )
         : product.AdditionalPrice;
 
@@ -359,7 +447,7 @@ const getAllProducts = async (userId) => {
     totalAllStock: 0,
   };
 
-  // Initialize branch totals structure
+  // Initialize branch totals structure (filtered by user access)
   branches.forEach((branch) => {
     overallTotals.branchTotals[branch.name] = {
       branchId: branch.id,
@@ -370,31 +458,59 @@ const getAllProducts = async (userId) => {
       totalBranchStock: 0,
     };
 
-    // Initialize shop totals for this branch
+    // Initialize shop totals for this branch (filtered by user access)
     shops
       .filter((shop) => shop.branchId === branch.id)
       .forEach((shop) => {
-        overallTotals.branchTotals[branch.name].shops[shop.name] = 0;
+        if (userId && userShopIds.length > 0) {
+          if (userShopIds.includes(shop.id)) {
+            overallTotals.branchTotals[branch.name].shops[shop.name] = 0;
+          }
+        } else {
+          overallTotals.branchTotals[branch.name].shops[shop.name] = 0;
+        }
       });
 
-    // Initialize store totals for this branch
+    // Initialize store totals for this branch (filtered by user access)
     stores
       .filter((store) => store.branchId === branch.id)
       .forEach((store) => {
-        overallTotals.branchTotals[branch.name].stores[store.name] = 0;
+        if (userId && userStoreIds.length > 0) {
+          if (userStoreIds.includes(store.id)) {
+            overallTotals.branchTotals[branch.name].stores[store.name] = 0;
+          }
+        } else {
+          overallTotals.branchTotals[branch.name].stores[store.name] = 0;
+        }
       });
   });
 
-  // Calculate totals across all products
+  // Calculate totals across all products (filtered by user access)
   productsWithDetailedStock.forEach((product) => {
     Object.entries(product.stockSummary.branchStocks).forEach(
       ([branchName, branchData]) => {
-        // Calculate shop-wise totals (filtered by user access if applicable)
+        // Calculate shop-wise totals (filtered by user access)
         Object.entries(branchData.shops).forEach(([shopName, quantity]) => {
-          if (userId && userShops.length > 0) {
-            // Check if this shop is accessible to user
-            const userShopNames = userShops.map((shop) => shop.name);
-            if (userShopNames.includes(shopName)) {
+          // Find the shop ID for this shop name
+          const shop = shops.find(
+            (s) => s.name === shopName && s.branch.name === branchName,
+          );
+
+          if (shop) {
+            if (userId && userShopIds.length > 0) {
+              // Check if this shop is accessible to user
+              if (userShopIds.includes(shop.id)) {
+                overallTotals.branchTotals[branchName].shops[shopName] =
+                  (overallTotals.branchTotals[branchName].shops[shopName] ||
+                    0) + quantity;
+                overallTotals.branchTotals[branchName].totalShopStock +=
+                  quantity;
+                overallTotals.branchTotals[branchName].totalBranchStock +=
+                  quantity;
+                overallTotals.totalShopStock += quantity;
+                overallTotals.totalAllStock += quantity;
+              }
+            } else {
               overallTotals.branchTotals[branchName].shops[shopName] =
                 (overallTotals.branchTotals[branchName].shops[shopName] || 0) +
                 quantity;
@@ -404,26 +520,42 @@ const getAllProducts = async (userId) => {
               overallTotals.totalShopStock += quantity;
               overallTotals.totalAllStock += quantity;
             }
-          } else {
-            overallTotals.branchTotals[branchName].shops[shopName] =
-              (overallTotals.branchTotals[branchName].shops[shopName] || 0) +
-              quantity;
-            overallTotals.branchTotals[branchName].totalShopStock += quantity;
-            overallTotals.branchTotals[branchName].totalBranchStock += quantity;
-            overallTotals.totalShopStock += quantity;
-            overallTotals.totalAllStock += quantity;
           }
         });
 
-        // Calculate store-wise totals
+        // Calculate store-wise totals (filtered by user access)
         Object.entries(branchData.stores).forEach(([storeName, quantity]) => {
-          overallTotals.branchTotals[branchName].stores[storeName] =
-            (overallTotals.branchTotals[branchName].stores[storeName] || 0) +
-            quantity;
-          overallTotals.branchTotals[branchName].totalStoreStock += quantity;
-          overallTotals.branchTotals[branchName].totalBranchStock += quantity;
-          overallTotals.totalStoreStock += quantity;
-          overallTotals.totalAllStock += quantity;
+          // Find the store ID for this store name
+          const store = stores.find(
+            (s) => s.name === storeName && s.branch.name === branchName,
+          );
+
+          if (store) {
+            if (userId && userStoreIds.length > 0) {
+              // Check if this store is accessible to user
+              if (userStoreIds.includes(store.id)) {
+                overallTotals.branchTotals[branchName].stores[storeName] =
+                  (overallTotals.branchTotals[branchName].stores[storeName] ||
+                    0) + quantity;
+                overallTotals.branchTotals[branchName].totalStoreStock +=
+                  quantity;
+                overallTotals.branchTotals[branchName].totalBranchStock +=
+                  quantity;
+                overallTotals.totalStoreStock += quantity;
+                overallTotals.totalAllStock += quantity;
+              }
+            } else {
+              overallTotals.branchTotals[branchName].stores[storeName] =
+                (overallTotals.branchTotals[branchName].stores[storeName] ||
+                  0) + quantity;
+              overallTotals.branchTotals[branchName].totalStoreStock +=
+                quantity;
+              overallTotals.branchTotals[branchName].totalBranchStock +=
+                quantity;
+              overallTotals.totalStoreStock += quantity;
+              overallTotals.totalAllStock += quantity;
+            }
+          }
         });
       },
     );
@@ -446,7 +578,14 @@ const getAllProducts = async (userId) => {
         name: shop.branch.name,
       },
     })),
-    // Overall totals are now included in each product
+    userAccessibleStores: userStores.map((store) => ({
+      id: store.id,
+      name: store.name,
+      branch: {
+        id: store.branch.id,
+        name: store.branch.name,
+      },
+    })),
   };
 };
 
