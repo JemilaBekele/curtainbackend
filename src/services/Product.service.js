@@ -390,6 +390,20 @@ const generateUniqueProductCode = async () => {
 
   return productCode;
 };
+const getProductByName = async (productName) => {
+  if (!productName || productName.trim() === '') {
+    return null;
+  }
+
+  return prisma.product.findFirst({
+    where: {
+      name: {
+        equals: productName,
+        mode: 'insensitive', // Case-insensitive comparison
+      },
+    },
+  });
+};
 const createProduct = async (productBody, files) => {
   // Generate product code if not provided
   let { productCode } = productBody;
@@ -402,7 +416,9 @@ const createProduct = async (productBody, files) => {
   if (await getProductByCode(productCode)) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Product code already taken');
   }
-
+  if (await getProductByName(productBody.name)) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Product name already exists');
+  }
   const parsedData = parseFormData(productBody);
   parsedData.productCode = productCode; // Add generated code to parsed data
 
@@ -660,9 +676,6 @@ const createProductBatch = async (productId, batchesData, userId) => {
   return createdBatches;
 };
 
-// Helper function to generate unique batch number
-
-// Update Product
 const updateProduct = async (id, updateBody, files) => {
   const existingProduct = await getProductById(id);
   if (!existingProduct) {
@@ -1484,8 +1497,6 @@ const getRandomProductsWithShopStocks = async (userId = null) => {
     note: 'Random products with available shop stock (no top-selling products found)',
   };
 };
-// Helper function to check if string is a valid UUID
-// Helper function to process product results - MOVED TO TOP
 function processProductResults(products) {
   const productResults = products.map((product) => {
     // Filter out batches that have no shop stocks after the query
