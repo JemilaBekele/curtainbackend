@@ -1579,6 +1579,7 @@ const clearWaitlist = async (cartId) => {
 };
 
 // Get waitlists by user
+// Get waitlists by user
 const getWaitlistsByUser = async (userId, filters = {}) => {
   const { startDate, endDate, includeNoCustomer = false } = filters;
 
@@ -1651,6 +1652,25 @@ const getWaitlistsByUser = async (userId, filters = {}) => {
       },
     });
 
+    // Log customer details for each waitlist
+    console.log('👥 Customer Details in waitlists:');
+    waitlists.forEach((waitlist, index) => {
+      console.log(`  Waitlist ${index + 1} (ID: ${waitlist.id}):`);
+      console.log(`    Customer ID: ${waitlist.customerId}`);
+      console.log(`    Customer object exists: ${!!waitlist.customer}`);
+      
+      if (waitlist.customer) {
+        console.log(`    Customer object keys: ${Object.keys(waitlist.customer).join(', ')}`);
+        console.log(`    Customer name: ${waitlist.customer.name || 'NULL/UNDEFINED'}`);
+        console.log(`    Customer email: ${waitlist.customer.email || 'NULL/UNDEFINED'}`);
+        console.log(`    Customer phone: ${waitlist.customer.phone || 'NULL/UNDEFINED'}`);
+        console.log(`    Full customer object:`, JSON.stringify(waitlist.customer, null, 2));
+      } else {
+        console.log(`    ⚠️ Customer object is null/undefined`);
+      }
+      console.log('---');
+    });
+
     console.log('📦 Full waitlist data found:', {
       totalWaitlists: waitlists.length,
       waitlistIds: waitlists.map((w) => w.id),
@@ -1660,6 +1680,10 @@ const getWaitlistsByUser = async (userId, filters = {}) => {
               id: waitlists[0].id,
               userId: waitlists[0].userId,
               customerId: waitlists[0].customerId,
+              customerObject: waitlists[0].customer, // Added
+              customerName: waitlists[0].customer?.name, // Added
+              customerEmail: waitlists[0].customer?.email, // Added
+              customerPhone: waitlists[0].customer?.phone, // Added
               cartItemId: waitlists[0].cartItemId,
               waitlistQuantity: waitlists[0].quantity,
               cartItemExists: !!waitlists[0].cartItem,
@@ -1668,6 +1692,25 @@ const getWaitlistsByUser = async (userId, filters = {}) => {
             }
           : null,
     });
+
+    // Also check the Prisma Customer model directly
+    if (waitlists.length > 0 && waitlists[0].customerId) {
+      console.log('🔍 Direct customer query for verification:');
+      try {
+        const directCustomer = await prisma.customer.findUnique({
+          where: { id: waitlists[0].customerId }
+        });
+        console.log('Direct customer query result:', {
+          found: !!directCustomer,
+          customer: directCustomer,
+          name: directCustomer?.name,
+          email: directCustomer?.email,
+          phone: directCustomer?.phone
+        });
+      } catch (error) {
+        console.log('Error in direct customer query:', error.message);
+      }
+    }
 
     // Transform the data structure
     console.log('🔄 Transforming waitlist data...');
@@ -1699,6 +1742,13 @@ const getWaitlistsByUser = async (userId, filters = {}) => {
         cartItemExists: !!waitlist.cartItem,
         cartItemQuantity: waitlist.cartItem?.quantity,
         hasCustomer: !!waitlist.customer,
+        // Added customer details:
+        customerId: waitlist.customerId,
+        customerName: waitlist.customer?.name,
+        customerEmail: waitlist.customer?.email,
+        customerPhone: waitlist.customer?.phone,
+        customerObjectType: typeof waitlist.customer,
+        customerIsObject: waitlist.customer && typeof waitlist.customer === 'object',
       });
 
       return {
@@ -1717,7 +1767,7 @@ const getWaitlistsByUser = async (userId, filters = {}) => {
 
         // Relations
         user: waitlist.user,
-        customer: waitlist.customer,
+        customer: waitlist.customer, // This should contain name, email, phone
         branch: waitlist.branch,
         cart: waitlist.cart,
         cartItem, // This now has the correct cart item quantity
@@ -1734,9 +1784,16 @@ const getWaitlistsByUser = async (userId, filters = {}) => {
               id: transformedWaitlists[0].id,
               waitlistQuantity: transformedWaitlists[0].quantity,
               cartItemQuantity: transformedWaitlists[0].cartItem?.quantity,
+              customerInResult: transformedWaitlists[0].customer, // Added
+              customerNameInResult: transformedWaitlists[0].customer?.name, // Added
             }
           : null,
     });
+
+    // Final check - what are we actually returning?
+    console.log('📤 Final return data structure check:');
+    console.log('First waitlist customer property:', transformedWaitlists[0]?.customer);
+    console.log('First waitlist customer name:', transformedWaitlists[0]?.customer?.name);
 
     return transformedWaitlists;
   } catch (error) {
