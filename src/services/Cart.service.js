@@ -1593,9 +1593,17 @@ const getWaitlistsByUser = async (userId, filters = {}) => {
     if (startDate) whereClause.createdAt.gte = new Date(startDate);
     if (endDate) whereClause.createdAt.lte = new Date(endDate);
   }
+
+  console.log('🔍 getWaitlistsByUser called with:', {
+    userId,
+    filters,
+    whereClause,
+  });
+
   try {
     // First, let's see what's in the database without includes
-    await prisma.waitlist.findMany({
+    console.log('📋 Fetching waitlists without includes...');
+    const basicWaitlists = await prisma.waitlist.findMany({
       where: whereClause,
       orderBy: { createdAt: 'desc' },
       select: {
@@ -1608,7 +1616,19 @@ const getWaitlistsByUser = async (userId, filters = {}) => {
       },
     });
 
+    console.log('📊 Basic waitlist data found:', {
+      count: basicWaitlists.length,
+      items: basicWaitlists.map((w) => ({
+        id: w.id,
+        cartItemId: w.cartItemId,
+        quantity: w.quantity,
+        customerId: w.customerId,
+        cartId: w.cartId,
+      })),
+    });
+
     // Now get full data with includes
+    console.log('🔍 Fetching full waitlist data with includes...');
     const waitlists = await prisma.waitlist.findMany({
       where: whereClause,
       orderBy: {
@@ -1631,7 +1651,26 @@ const getWaitlistsByUser = async (userId, filters = {}) => {
       },
     });
 
+    console.log('📦 Full waitlist data found:', {
+      totalWaitlists: waitlists.length,
+      waitlistIds: waitlists.map((w) => w.id),
+      sampleWaitlist:
+        waitlists.length > 0
+          ? {
+              id: waitlists[0].id,
+              userId: waitlists[0].userId,
+              customerId: waitlists[0].customerId,
+              cartItemId: waitlists[0].cartItemId,
+              waitlistQuantity: waitlists[0].quantity,
+              cartItemExists: !!waitlists[0].cartItem,
+              cartItemQuantity: waitlists[0].cartItem?.quantity,
+              customerExists: !!waitlists[0].customer,
+            }
+          : null,
+    });
+
     // Transform the data structure
+    console.log('🔄 Transforming waitlist data...');
     const transformedWaitlists = waitlists.map((waitlist) => {
       // Create a properly structured cartItem if it exists
       const cartItem = waitlist.cartItem
@@ -1652,6 +1691,15 @@ const getWaitlistsByUser = async (userId, filters = {}) => {
             unitOfMeasure: waitlist.cartItem.unitOfMeasure,
           }
         : null;
+
+      console.log(`   🔄 Transforming waitlist ${waitlist.id}:`, {
+        waitlistId: waitlist.id,
+        waitlistQuantity: waitlist.quantity,
+        cartItemId: waitlist.cartItemId,
+        cartItemExists: !!waitlist.cartItem,
+        cartItemQuantity: waitlist.cartItem?.quantity,
+        hasCustomer: !!waitlist.customer,
+      });
 
       return {
         id: waitlist.id,
@@ -1678,9 +1726,27 @@ const getWaitlistsByUser = async (userId, filters = {}) => {
       };
     });
 
+    console.log('✅ Transformation complete:', {
+      totalTransformed: transformedWaitlists.length,
+      sampleTransformed:
+        transformedWaitlists.length > 0
+          ? {
+              id: transformedWaitlists[0].id,
+              waitlistQuantity: transformedWaitlists[0].quantity,
+              cartItemQuantity: transformedWaitlists[0].cartItem?.quantity,
+            }
+          : null,
+    });
+
     return transformedWaitlists;
   } catch (error) {
     console.error('❌ Error in getWaitlistsByUser:', error);
+    console.error('📌 Error details:', {
+      message: error.message,
+      code: error.code,
+      meta: error.meta,
+      stack: error.stack,
+    });
     throw error;
   }
 };
