@@ -1652,7 +1652,6 @@ const getWaitlistsByUser = async (userId, filters = {}) => {
             unitOfMeasure: waitlist.cartItem.unitOfMeasure,
           }
         : null;
-    console.log('First waitlist customer name:', transformedWaitlists[0]?.customer?.name);
 
       return {
         id: waitlist.id,
@@ -1678,6 +1677,7 @@ const getWaitlistsByUser = async (userId, filters = {}) => {
         updatedBy: waitlist.updatedBy,
       };
     });
+    console.log('First waitlist customer name:', transformedWaitlists[0]?.customer?.name);
 
     return transformedWaitlists;
   } catch (error) {
