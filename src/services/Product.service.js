@@ -399,7 +399,6 @@ const getProductByName = async (productName) => {
     where: {
       name: {
         equals: productName,
-        mode: 'insensitive', // Case-insensitive comparison
       },
     },
   });
@@ -407,6 +406,7 @@ const getProductByName = async (productName) => {
 const createProduct = async (productBody, files) => {
   // Generate product code if not provided
   let { productCode } = productBody;
+  const { name } = productBody;
 
   if (!productCode || productCode.trim() === '') {
     productCode = await generateUniqueProductCode();
@@ -416,7 +416,7 @@ const createProduct = async (productBody, files) => {
   if (await getProductByCode(productCode)) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Product code already taken');
   }
-  if (await getProductByName(productBody.name)) {
+  if (await getProductByName(name)) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Product name already exists');
   }
   const parsedData = parseFormData(productBody);
