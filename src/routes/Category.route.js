@@ -3,13 +3,13 @@ const express = require('express');
 const router = express.Router();
 const { categoryController } = require('../controllers');
 const auth = require('../middlewares/auth');
-// const checkPermission = require('../middlewares/permission.middleware');
+const checkPermission = require('../middlewares/permission.middleware');
 
 // Category Routes
 router.post(
   '/api/categories',
   auth,
-  //   checkPermission('CREATE_CATEGORY'),
+  checkPermission('CREATE_CATEGORY'),
   categoryController.createCategory,
 );
 
@@ -29,68 +29,52 @@ router.get(
 router.put(
   '/api/categories/:id',
   auth,
-  //   checkPermission('UPDATE_CATEGORY'),
+  checkPermission('UPDATE_CATEGORY'),
   categoryController.updateCategory,
 );
 
 router.delete(
   '/api/categories/:id',
   auth,
-  //   checkPermission('DELETE_CATEGORY'),
+  checkPermission('DELETE_CATEGORY'),
   categoryController.deleteCategory,
 );
 
-// SubCategory Routes
 router.post(
-  '/api/subcategories',
+  '/api/colours',
   auth,
-  //   checkPermission('CREATE_SUBCATEGORY'),
-  categoryController.createSubCategory,
+  checkPermission('CREATE_COLOUR'),
+  categoryController.createColour,
 );
 
+// Get all Colours
 router.get(
-  '/api/subcategories/:id',
-  auth,
-  //   checkPermission('VIEW_SUBCATEGORY'),
-  categoryController.getSubCategory,
-);
-router.get(
-  '/api/products/subcategory/all/:subCategoryId',
-  auth,
-  // checkPermission('VIEW_PRODUCTS'),
-  categoryController.getProductsBySubCategory,
+  '/api/colours',
+  // checkPermission('VIEW_COLOUR'),
+  categoryController.getColours,
 );
 
-// Get products by subcategory name and category ID
+// Get Colour by ID
 router.get(
-  '/api/products/category/:categoryId/subcategory',
+  '/api/colours/:id',
   auth,
-  // checkPermission('VIEW_PRODUCTS'),
-  categoryController.getProductsBySubCategoryName,
-);
-router.get(
-  '/api/subcategories',
-  //   checkPermission('VIEW_SUBCATEGORY'),
-  categoryController.getSubCategoriesByCategory,
-);
-router.get(
-  '/api/subcategories/veiw/all/find',
-  //   checkPermission('VIEW_SUBCATEGORY'),
-  categoryController.getAllSubCategories,
+  // checkPermission('VIEW_COLOUR'),
+  categoryController.getColour,
 );
 
-router.put(
-  '/api/subcategories/:id',
+// Update Colour
+router.patch(
+  '/api/colours/:id',
   auth,
-  //   checkPermission('UPDATE_SUBCATEGORY'),
-  categoryController.updateSubCategory,
+  checkPermission('UPDATE_COLOUR'),
+  categoryController.updateColour,
 );
 
+// Delete Colour
 router.delete(
-  '/api/subcategories/:id',
+  '/api/colours/:id',
   auth,
-  //   checkPermission('DELETE_SUBCATEGORY'),
-  categoryController.deleteSubCategory,
+  checkPermission('DELETE_COLOUR'),
+  categoryController.deleteColour,
 );
-
 module.exports = router;

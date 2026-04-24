@@ -65,6 +65,19 @@ const getAllProducts = catchAsync(async (req, res) => {
     },
   });
 });
+const getEstimatedCurtainDeliveryTime = catchAsync(async (req, res) => {
+  const { startDate, endDate } = req.query;
+
+  const result = await branchService.getEstimatedCurtainDeliveryTime(
+    startDate,
+    endDate,
+  );
+
+  res.status(httpStatus.OK).send({
+    success: true,
+    ...result,
+  });
+});
 module.exports = {
   createBranch,
   getBranch,
@@ -72,4 +85,5 @@ module.exports = {
   updateBranch,
   deleteBranch,
   getAllProducts,
+  getEstimatedCurtainDeliveryTime,
 };

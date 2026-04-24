@@ -26,3 +26,10 @@ module.exports.GeneralDashboardController = require('./GeneralDashboard.controll
 module.exports.cartController = require('./Cart.controller');
 
 module.exports.yearEndResetController = require('./yearEndReset.controller');
+
+module.exports.curtainTypeController = require('./CurtainType.controller');
+module.exports.curtainOrderController = require('./CurtainOrder.controller');
+module.exports.curtainWorkerLogController = require('./CurtainWorkerLog.controller');
+
+module.exports.workerCommissionController = require('./workerCommission.controller');
+module.exports.dashboardController = require('./GeneralDashboard.controller');

@@ -269,7 +269,7 @@ const updateProductBatchWithAdditionalPrices = async (batchId, updateBody) => {
   return updatedBatch;
 };
 
-// Get product by store ID and stock ID
+// Get product by store ID and product ID
 const getProductByStoreStock = async (storeId) => {
   try {
     const storeStocks = await prisma.storeStock.findMany({
@@ -277,92 +277,107 @@ const getProductByStoreStock = async (storeId) => {
         storeId,
       },
       include: {
-        batch: {
+        product: {
           include: {
-            product: {
-              include: {
-                category: true,
-                subCategory: true,
-                unitOfMeasure: true, // Include unit of measure
-              },
-            },
+            category: true,
+            colour: true,
+            unitOfMeasure: true,
           },
         },
         store: true,
-        unitOfMeasure: true, // Include the unit of measure from store stock
+        unitOfMeasure: true,
+        variants: {
+          orderBy: [{ height: 'asc' }, { width: 'asc' }], // Add ordering for consistent display
+        },
       },
     });
 
     if (!storeStocks || storeStocks.length === 0) {
-      throw new Error(`No store stocks found for storeId: ${storeId}`);
+      return []; // Return empty array instead of throwing error for better UX
     }
 
-    // Debug each stock to check for missing relations
-    const validStocks = storeStocks.filter((stock) => {
-      if (!stock.batch) {
-        return false;
-      }
-      if (!stock.batch.product) {
-        return false;
-      }
-      return true;
-    });
-
     // Return enriched data with all necessary information
-    const result = validStocks.map((storeStock) => {
-      const { product } = storeStock.batch;
+    const result = storeStocks
+      .filter((stock) => stock.product) // Only include stocks with valid products
+      .map((storeStock) => {
+        const { product } = storeStock;
 
-      return {
-        id: storeStock.id,
-        storeId: storeStock.storeId,
-        batchId: storeStock.batchId,
-        quantity: storeStock.quantity,
-        status: storeStock.status,
-        createdAt: storeStock.createdAt,
-        updatedAt: storeStock.updatedAt,
+        // Check if this is a dimension-based item (has variants)
+        const hasVariants =
+          storeStock.variants && storeStock.variants.length > 0;
 
-        // Store information
-        store: {
-          id: storeStock.store.id,
-          name: storeStock.store.name,
-          branchId: storeStock.store.branchId,
-        },
+        // Calculate total available quantity (from variants if dimension-based, otherwise from main quantity)
+        const availableQuantity = hasVariants
+          ? storeStock.variants.reduce((sum, v) => sum + v.quantity, 0)
+          : storeStock.quantity || 0;
 
-        // Batch information
-        batch: {
-          id: storeStock.batch.id,
-          batchNumber: storeStock.batch.batchNumber,
-          expiryDate: storeStock.batch.expiryDate,
-          price: storeStock.batch.price,
-        },
+        // For dimension-based items, also calculate total area if needed
+        const totalArea = hasVariants
+          ? storeStock.variants.reduce(
+              (sum, v) => sum + v.height * v.width * v.quantity,
+              0,
+            )
+          : null;
 
-        // Product information with all details
-        product: {
-          id: product.id,
-          productCode: product.productCode,
-          name: product.name,
-          generic: product.generic,
-          description: product.description,
-          sellPrice: product.sellPrice,
-          imageUrl: product.imageUrl,
-          isActive: product.isActive,
+        return {
+          id: storeStock.id,
+          storeId: storeStock.storeId,
+          productId: storeStock.productId,
+          quantity: storeStock.quantity,
+          status: storeStock.status,
+          createdAt: storeStock.createdAt,
+          updatedAt: storeStock.updatedAt,
 
-          // Category and subcategory
-          category: product.category,
-          subCategory: product.subCategory,
+          store: {
+            id: storeStock.store.id,
+            name: storeStock.store.name,
+            branchId: storeStock.store.branchId,
+          },
 
-          // Unit of measure information from product
-          unitOfMeasure: product.unitOfMeasure,
-        },
+          product: {
+            id: product.id,
+            productCode: product.productCode,
+            name: product.name,
+            generic: product.generic,
+            description: product.description,
+            sellPrice: product.sellPrice,
+            imageUrl: product.imageUrl,
+            isActive: product.isActive,
+            warningQuantity: product.warningQuantity,
+            category: product.category,
+            colour: product.colour,
+            unitOfMeasure: product.unitOfMeasure,
+          },
 
-        // Unit of measure specific to this stock entry
-        unitOfMeasure: storeStock.unitOfMeasure,
+          unitOfMeasure: storeStock.unitOfMeasure,
 
-        // Helper fields for frontend
-        availableQuantity: storeStock.quantity, // Original quantity
-        conversionFactor: storeStock.unitOfMeasure?.conversionFactor || 1,
-      };
-    });
+          // Helper fields
+          availableQuantity,
+          totalArea, // Add total area for dimension-based items
+          conversionFactor: storeStock.unitOfMeasure?.conversionFactor || 1,
+
+          // Variants with additional calculated fields
+          variants: hasVariants
+            ? storeStock.variants.map((variant) => ({
+                id: variant.id,
+                height: variant.height,
+                width: variant.width,
+                quantity: variant.quantity,
+                area: variant.height * variant.width,
+                totalArea: variant.height * variant.width * variant.quantity, // Total area for this variant
+              }))
+            : [],
+
+          stockType: hasVariants ? 'dimension' : 'quantity',
+          hasVariants,
+
+          // Add metadata about variants
+          variantCount: hasVariants ? storeStock.variants.length : 0,
+          uniqueDimensions: hasVariants
+            ? storeStock.variants.map((v) => `${v.height}x${v.width}`)
+            : [],
+        };
+      });
 
     return result;
   } catch (error) {
@@ -371,6 +386,7 @@ const getProductByStoreStock = async (storeId) => {
   }
 };
 
+// Similar improvements for getProductByShopStock
 const getProductByShopStock = async (shopId) => {
   try {
     const shopStocks = await prisma.shopStock.findMany({
@@ -378,99 +394,162 @@ const getProductByShopStock = async (shopId) => {
         shopId,
       },
       include: {
-        batch: {
+        product: {
           include: {
-            product: {
-              include: {
-                category: true,
-                subCategory: true,
-                unitOfMeasure: true, // Include unit of measure
+            category: true,
+            colour: true,
+            unitOfMeasure: true,
+            curtainType: true,
+            AdditionalPrice: {
+              where: {
+                OR: [{ shopId }, { shopId: null }],
               },
             },
           },
         },
-        shop: true,
-        unitOfMeasure: true, // Include the unit of measure from shop stock
+        shop: {
+          include: {
+            branch: true,
+          },
+        },
+        unitOfMeasure: true,
+        variants: {
+          orderBy: [{ height: 'asc' }, { width: 'asc' }], // Add ordering for consistent display
+        },
       },
     });
 
     if (!shopStocks || shopStocks.length === 0) {
-      throw new Error(`No shop stocks found for shopId: ${shopId}`);
+      return [];
     }
 
-    // Debug each stock
-    const validStocks = shopStocks.filter((stock) => {
-      if (!stock.batch) {
-        return false;
-      }
-      if (!stock.batch.product) {
-        return false;
-      }
-      return true;
-    });
+    const result = shopStocks
+      .filter((stock) => stock.product)
+      .map((shopStock) => {
+        const { product, shop } = shopStock;
 
-    // Return enriched data with all necessary information
-    const result = validStocks.map((shopStock) => {
-      const { product } = shopStock.batch;
+        const hasVariants = shopStock.variants && shopStock.variants.length > 0;
 
-      return {
-        id: shopStock.id,
-        shopId: shopStock.shopId,
-        batchId: shopStock.batchId,
-        quantity: shopStock.quantity,
-        status: shopStock.status,
-        createdAt: shopStock.createdAt,
-        updatedAt: shopStock.updatedAt,
+        const availableQuantity = hasVariants
+          ? shopStock.variants.reduce((sum, v) => sum + v.quantity, 0)
+          : shopStock.quantity || 0;
 
-        // Shop information
-        shop: {
-          id: shopStock.shop.id,
-          name: shopStock.shop.name,
-          branchId: shopStock.shop.branchId,
-        },
+        // Calculate total area for dimension-based items
+        const totalArea = hasVariants
+          ? shopStock.variants.reduce(
+              (sum, v) => sum + v.height * v.width * v.quantity,
+              0,
+            )
+          : null;
 
-        // Batch information
-        batch: {
-          id: shopStock.batch.id,
-          batchNumber: shopStock.batch.batchNumber,
-          expiryDate: shopStock.batch.expiryDate,
-          price: shopStock.batch.price,
-        },
+        const calculateFinalPrice = () => {
+          const basePrice = parseFloat(product.sellPrice || 0);
+          const applicablePrices = product.AdditionalPrice.filter(
+            (price) => price.shopId === shopId || price.shopId === null,
+          );
+          const additionalTotal = applicablePrices.reduce((sum, price) => {
+            return sum + parseFloat(price.price || 0);
+          }, 0);
+          return basePrice + additionalTotal;
+        };
 
-        // Product information with all details
-        product: {
-          id: product.id,
-          productCode: product.productCode,
-          name: product.name,
-          generic: product.generic,
-          description: product.description,
-          sellPrice: product.sellPrice,
-          imageUrl: product.imageUrl,
-          isActive: product.isActive,
+        const isCurtainProduct =
+          product.category?.name?.toLowerCase().includes('curtain') ||
+          product.curtainType !== null;
 
-          // Category and subcategory
-          category: product.category,
-          subCategory: product.subCategory,
+        return {
+          id: shopStock.id,
+          shopId: shopStock.shopId,
+          productId: shopStock.productId,
+          quantity: shopStock.quantity,
+          status: shopStock.status,
+          createdAt: shopStock.createdAt,
+          updatedAt: shopStock.updatedAt,
 
-          // Unit of measure information from product
-          unitOfMeasure: product.unitOfMeasure,
-        },
+          shop: {
+            id: shop.id,
+            name: shop.name,
+            branchId: shop.branchId,
+            branch: shop.branch
+              ? {
+                  id: shop.branch.id,
+                  name: shop.branch.name,
+                  address: shop.branch.address,
+                  phone: shop.branch.phone,
+                  email: shop.branch.email,
+                }
+              : null,
+          },
 
-        // Unit of measure specific to this stock entry
-        unitOfMeasure: shopStock.unitOfMeasure,
+          product: {
+            id: product.id,
+            productCode: product.productCode,
+            name: product.name,
+            generic: product.generic,
+            description: product.description,
+            sellPrice: product.sellPrice,
+            imageUrl: product.imageUrl,
+            isActive: product.isActive,
+            warningQuantity: product.warningQuantity,
+            fabricName: product.fabricName,
+            thickCurtain: product.thickCurtain,
+            thinCurtain: product.thinCurtain,
+            pullsCurtain: product.pullsCurtain,
+            poleCurtain: product.poleCurtain,
+            bracketsCurtain: product.bracketsCurtain,
+            shatterVertical: product.shatterVertical,
+            pricePerMeter: product.pricePerMeter,
+            category: product.category,
+            colour: product.colour,
+            curtainType: product.curtainType,
+            unitOfMeasure: product.unitOfMeasure,
+            additionalPrices: product.AdditionalPrice.map((price) => ({
+              id: price.id,
+              label: price.label,
+              price: price.price,
+              shopId: price.shopId,
+            })),
+          },
 
-        // Helper fields for frontend
-        availableQuantity: shopStock.quantity, // Original quantity
-        conversionFactor: shopStock.unitOfMeasure?.conversionFactor || 1,
-      };
-    });
+          unitOfMeasure: shopStock.unitOfMeasure,
+          availableQuantity,
+          totalArea, // Add total area for dimension-based items
+          finalSellPrice: calculateFinalPrice(),
+          isCurtainProduct,
+          unitOfMeasureMatches:
+            shopStock.unitOfMeasureId === product.unitOfMeasureId,
+
+          variants: hasVariants
+            ? shopStock.variants.map((variant) => ({
+                id: variant.id,
+                height: variant.height,
+                width: variant.width,
+                quantity: variant.quantity,
+                area: variant.height * variant.width,
+                totalArea: variant.height * variant.width * variant.quantity,
+              }))
+            : [],
+
+          stockType: hasVariants ? 'dimension' : 'quantity',
+          hasVariants,
+          variantCount: hasVariants ? shopStock.variants.length : 0,
+          uniqueDimensions: hasVariants
+            ? shopStock.variants.map((v) => `${v.height}x${v.width}`)
+            : [],
+        };
+      });
 
     return result;
   } catch (error) {
     console.error('Error in getProductByShopStock:', error);
-    throw error;
+    if (error.code) console.error('Error code:', error.code);
+    if (error.meta) console.error('Error meta:', error.meta);
+    throw new Error(
+      `Failed to fetch products for shop ${shopId}: ${error.message}`,
+    );
   }
 };
+
 const getProductInfoByBatchId = async (batchId) => {
   const batch = await prisma.productBatch.findUnique({
     where: { id: batchId },

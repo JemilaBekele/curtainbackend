@@ -33,24 +33,6 @@ const createProduct = catchAsync(async (req, res) => {
     product,
   });
 });
-const createProductBatch = catchAsync(async (req, res) => {
-  const { productId } = req.params;
-  const batchData = req.body;
-  const userId = req.user.id; // Assuming user is attached to request during authentication
-
-  const productBatch = await productService.createProductBatch(
-    productId,
-    batchData,
-    userId,
-  );
-
-  res.status(httpStatus.CREATED).send({
-    success: true,
-    message: 'Product batch created successfully',
-    productBatch,
-  });
-});
-// Update Product
 const updateProduct = catchAsync(async (req, res) => {
   // Structure files by field name
   const structuredFiles = {};
@@ -83,6 +65,43 @@ const updateProduct = catchAsync(async (req, res) => {
     product,
   });
 });
+const createProductStock = catchAsync(async (req, res) => {
+  const { productId } = req.params;
+  const userId = req.user.id;
+
+  // Extract stocks array from request body
+  // The frontend is sending { stocks: [...] } so we need to extract the array
+  let stockData = req.body;
+
+  // Check if the body has a 'stocks' property
+  if (stockData && stockData.stocks && Array.isArray(stockData.stocks)) {
+    stockData = stockData.stocks;
+  } else if (stockData && !Array.isArray(stockData)) {
+    // If it's a single object but not in an array, wrap it
+    stockData = [stockData];
+  }
+
+  try {
+    const productBatch = await productService.createProductStock(
+      productId,
+      stockData, // Now this should be an array
+      userId,
+    );
+
+    res.status(httpStatus.CREATED).send({
+      success: true,
+      message: 'Product stock created successfully',
+      productBatch,
+    });
+  } catch (error) {
+    res.status(error.statusCode || httpStatus.INTERNAL_SERVER_ERROR).send({
+      success: false,
+      message: error.message || 'Internal server error',
+    });
+  }
+});
+// Update Product
+
 // Get Product by ID
 const getProduct = catchAsync(async (req, res) => {
   const product = await productService.getProductById(req.params.id);
@@ -126,8 +145,6 @@ const getActiveAllProducts = catchAsync(async (req, res) => {
 
 const getProducts = catchAsync(async (req, res) => {
   const userId = req.user.id;
-  console.log('Fetching products for user ID:', userId);
-
   const result = await productService.getAllProducts(userId);
   res.status(httpStatus.OK).send({
     success: true,
@@ -146,13 +163,6 @@ const getTopSellingProducts = catchAsync(async (req, res) => {
   const processedSubCategoryId =
     subCategoryId && subCategoryId.trim() !== '' ? subCategoryId.trim() : null;
 
-  // DEBUG: Check if parameters are being mixed up
-  if (processedSearchTerm && isValidUUID(processedSearchTerm)) {
-    console.warn(
-      '⚠️ WARNING: searchTerm looks like a UUID, might be parameter mixup',
-    );
-  }
-
   const result = await productService.getTopSellingProducts(
     userId,
     processedSearchTerm, // This should be the text search
@@ -165,13 +175,6 @@ const getTopSellingProducts = catchAsync(async (req, res) => {
     ...result,
   });
 });
-
-// Helper function to check if string is a valid UUID
-function isValidUUID(str) {
-  const uuidRegex =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  return uuidRegex.test(str);
-}
 const getRandomProductsWithShopStocks = catchAsync(async (req, res) => {
   const result = await productService.getRandomProductsWithShopStocks();
 
@@ -243,7 +246,7 @@ const getProductBatchesByShopsForUser = catchAsync(async (req, res) => {
 });
 
 module.exports = {
-  createProductBatch,
+  createProductStock,
   createProduct,
   getProduct,
   getProductByCode,

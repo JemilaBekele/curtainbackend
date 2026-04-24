@@ -588,7 +588,104 @@ const getAllProducts = async (userId) => {
     })),
   };
 };
+const getEstimatedCurtainDeliveryTime = async (startDate, endDate) => {
+  const whereCondition = {
+    deliveryDeadline: {
+      not: null,
+    },
+    curtainStatus: {
+      in: ['COMPLETED', 'DELIVERED'],
+    },
+  };
 
+  // Date filter
+  if (startDate || endDate) {
+    whereCondition.createdAt = {};
+
+    if (startDate) {
+      whereCondition.createdAt.gte = new Date(startDate);
+    }
+
+    if (endDate) {
+      whereCondition.createdAt.lte = new Date(endDate);
+    }
+  }
+
+  const orders = await prisma.curtainOrder.findMany({
+    where: whereCondition,
+    orderBy: {
+      createdAt: 'desc',
+    },
+    take: 100,
+    select: {
+      id: true,
+      code: true,
+      createdAt: true,
+      deliveryDeadline: true,
+      curtainStatus: true,
+      paymentStatus: true,
+
+      customer: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+
+      movementType: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+
+      totalAmount: true,
+      balance: true,
+      totalPaid: true,
+      remark: true,
+      isSiteMeasured: true,
+      siteMeasurePrice: true,
+    },
+  });
+
+  if (!orders.length) {
+    const fallbackDays = 7;
+
+    return {
+      success: true,
+      averageDays: fallbackDays,
+      estimatedDate: new Date(Date.now() + fallbackDays * 24 * 60 * 60 * 1000),
+      totalOrdersUsed: 0,
+      orders: [],
+      message: 'No delivery history found',
+    };
+  }
+
+  // Calculate average delivery time
+  const totalDays = orders.reduce((sum, order) => {
+    const start = new Date(order.createdAt);
+    const end = new Date(order.deliveryDeadline);
+
+    const diffDays = Math.ceil(
+      Math.abs(end - start) / (1000 * 60 * 60 * 24)
+    );
+
+    return sum + diffDays;
+  }, 0);
+
+  const averageDays = Math.ceil(totalDays / orders.length);
+
+  const estimatedDate = new Date();
+  estimatedDate.setDate(estimatedDate.getDate() + averageDays);
+
+  return {
+    success: true,
+    averageDays,
+    estimatedDate,
+    totalOrdersUsed: orders.length,
+    orders,
+  };
+};
 module.exports = {
   getBranchById,
   getBranchByName,
@@ -597,4 +694,5 @@ module.exports = {
   updateBranch,
   deleteBranch,
   getAllProducts,
+  getEstimatedCurtainDeliveryTime,
 };

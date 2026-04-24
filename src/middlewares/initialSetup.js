@@ -89,7 +89,6 @@ class SystemInitializer {
         admin: true,
       };
 
-      // First try to find existing admin user
       let adminUser;
       try {
         adminUser = await userService.getUserByEmail(adminData.email);

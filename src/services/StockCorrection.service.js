@@ -18,7 +18,6 @@ const getStockCorrectionById = async (id) => {
       items: {
         include: {
           product: true,
-          batch: true,
           unitOfMeasure: true,
         },
       },
@@ -42,7 +41,6 @@ const getStockCorrectionsByPurchaseId = async (purchaseId) => {
       items: {
         include: {
           product: true,
-          batch: true,
           unitOfMeasure: true,
         },
       },
@@ -120,16 +118,6 @@ const createStockCorrection = async (stockCorrectionBody, userId) => {
   // Check if reference already exists
   const shortCode = await generateShortCode();
 
-  // if (
-  //   stockCorrectionBody.reference &&
-  //   (await getStockCorrectionByReference(stockCorrectionBody.reference))
-  // ) {
-  //   throw new ApiError(
-  //     httpStatus.BAD_REQUEST,
-  //     'Stock correction reference already taken',
-  //   );
-  // }
-
   // Parse items if it's a string
   const { items: itemsString, ...restStockCorrectionBody } =
     stockCorrectionBody;
@@ -169,6 +157,37 @@ const createStockCorrection = async (stockCorrectionBody, userId) => {
         httpStatus.BAD_REQUEST,
         `Item ${index + 1} quantity cannot be zero`,
       );
+    }
+
+    // Validate dimensions - both must be provided together or neither
+    const hasHeight = item.height !== undefined && item.height !== null;
+    const hasWidth = item.width !== undefined && item.width !== null;
+
+    if (hasHeight !== hasWidth) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        `Item ${
+          index + 1
+        }: Both height and width must be provided together for dimension-based items`,
+      );
+    }
+
+    // If dimensions are provided, validate they are positive
+    if (hasHeight && hasWidth) {
+      if (item.height <= 0) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Item ${
+            index + 1
+          } has invalid height. Height must be greater than 0.`,
+        );
+      }
+      if (item.width <= 0) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Item ${index + 1} has invalid width. Width must be greater than 0.`,
+        );
+      }
     }
   });
 
@@ -214,9 +233,11 @@ const createStockCorrection = async (stockCorrectionBody, userId) => {
       items: {
         create: items.map((item) => ({
           productId: item.productId,
-          batchId: item.batchId || null,
           unitOfMeasureId: item.unitOfMeasureId,
           quantity: item.quantity,
+          // Add height and width if they exist
+          ...(item.height !== undefined && { height: item.height }),
+          ...(item.width !== undefined && { width: item.width }),
         })),
       },
     },
@@ -224,8 +245,12 @@ const createStockCorrection = async (stockCorrectionBody, userId) => {
       items: {
         include: {
           unitOfMeasure: true,
-          product: true,
-          batch: true,
+          product: {
+            include: {
+              colour: true,
+              category: true,
+            },
+          },
         },
       },
     },
@@ -293,6 +318,47 @@ const updateStockCorrection = async (
         } is missing required fields (productId or unitOfMeasureId)`,
       );
     }
+
+    // Validate quantity if provided
+    if (item.quantity !== undefined) {
+      if (item.quantity === 0) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Item ${index + 1} quantity cannot be zero`,
+        );
+      }
+    }
+
+    // Validate dimensions - both must be provided together or neither
+    const hasHeight = item.height !== undefined && item.height !== null;
+    const hasWidth = item.width !== undefined && item.width !== null;
+
+    if (hasHeight !== hasWidth) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        `Item ${
+          index + 1
+        }: Both height and width must be provided together for dimension-based items`,
+      );
+    }
+
+    // If dimensions are provided, validate they are positive
+    if (hasHeight && hasWidth) {
+      if (item.height <= 0) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Item ${
+            index + 1
+          } has invalid height. Height must be greater than 0.`,
+        );
+      }
+      if (item.width <= 0) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Item ${index + 1} has invalid width. Width must be greater than 0.`,
+        );
+      }
+    }
   });
 
   // Clean up empty string values
@@ -343,9 +409,11 @@ const updateStockCorrection = async (
         items: {
           create: items.map((item) => ({
             productId: item.productId,
-            batchId: item.batchId || null,
             unitOfMeasureId: item.unitOfMeasureId,
             quantity: item.quantity,
+            // Add height and width if they exist
+            ...(item.height !== undefined && { height: item.height }),
+            ...(item.width !== undefined && { width: item.width }),
           })),
         },
       },
@@ -353,6 +421,12 @@ const updateStockCorrection = async (
         items: {
           include: {
             unitOfMeasure: true,
+            product: {
+              include: {
+                colour: true,
+                category: true,
+              },
+            },
           },
         },
       },
@@ -394,9 +468,9 @@ const deleteStockCorrection = async (id, userId) => {
           if (existingStockCorrection.storeId) {
             const existingStoreStock = await tx.storeStock.findUnique({
               where: {
-                storeId_batchId: {
+                storeId_productId: {
                   storeId: existingStockCorrection.storeId,
-                  batchId: item.batchId || 'no-batch',
+                  productId: item.productId,
                 },
               },
             });
@@ -411,9 +485,9 @@ const deleteStockCorrection = async (id, userId) => {
                 operations.push(
                   tx.storeStock.delete({
                     where: {
-                      storeId_batchId: {
+                      storeId_productId: {
                         storeId: existingStockCorrection.storeId,
-                        batchId: item.batchId || 'no-batch',
+                        productId: item.productId,
                       },
                     },
                   }),
@@ -423,9 +497,9 @@ const deleteStockCorrection = async (id, userId) => {
                 operations.push(
                   tx.storeStock.update({
                     where: {
-                      storeId_batchId: {
+                      storeId_productId: {
                         storeId: existingStockCorrection.storeId,
-                        batchId: item.batchId || 'no-batch',
+                        productId: item.productId,
                       },
                     },
                     data: {
@@ -440,9 +514,9 @@ const deleteStockCorrection = async (id, userId) => {
           } else if (existingStockCorrection.shopId) {
             const existingShopStock = await tx.shopStock.findUnique({
               where: {
-                shopId_batchId: {
+                shopId_productId: {
                   shopId: existingStockCorrection.shopId,
-                  batchId: item.batchId || 'no-batch',
+                  productId: item.productId,
                 },
               },
             });
@@ -457,9 +531,9 @@ const deleteStockCorrection = async (id, userId) => {
                 operations.push(
                   tx.shopStock.delete({
                     where: {
-                      shopId_batchId: {
+                      shopId_productId: {
                         shopId: existingStockCorrection.shopId,
-                        batchId: item.batchId || 'no-batch',
+                        productId: item.productId,
                       },
                     },
                   }),
@@ -469,9 +543,9 @@ const deleteStockCorrection = async (id, userId) => {
                 operations.push(
                   tx.shopStock.update({
                     where: {
-                      shopId_batchId: {
+                      shopId_productId: {
                         shopId: existingStockCorrection.shopId,
-                        batchId: item.batchId || 'no-batch',
+                        productId: item.productId,
                       },
                     },
                     data: {
@@ -493,7 +567,7 @@ const deleteStockCorrection = async (id, userId) => {
             operations.push(
               tx.stockLedger.create({
                 data: {
-                  batchId: item.batchId,
+                  productId: item.productId,
                   storeId: existingStockCorrection.storeId,
                   invoiceNo: `REV-${existingStockCorrection.shortCode}`,
                   movementType: reversalMovementType,
@@ -510,7 +584,7 @@ const deleteStockCorrection = async (id, userId) => {
             operations.push(
               tx.stockLedger.create({
                 data: {
-                  batchId: item.batchId,
+                  productId: item.productId,
                   invoiceNo: `REV-${existingStockCorrection.shortCode}`,
                   shopId: existingStockCorrection.shopId,
                   movementType: reversalMovementType,
@@ -572,343 +646,553 @@ const deleteStockCorrection = async (id, userId) => {
 };
 
 // Approve StockCorrection
+
 const approveStockCorrection = async (stockCorrectionId, userId) => {
-  console.log('Starting approveStockCorrection:', { stockCorrectionId, userId });
+  try {
+    const stockCorrection = await getStockCorrectionById(stockCorrectionId);
 
-  const stockCorrection = await getStockCorrectionById(stockCorrectionId);
-  console.log('Retrieved stock correction:', {
-    id: stockCorrection?.id,
-    status: stockCorrection?.status,
-    storeId: stockCorrection?.storeId,
-    shopId: stockCorrection?.shopId,
-    itemsCount: stockCorrection?.items?.length
-  });
-
-  if (!stockCorrection) {
-    console.error('Stock correction not found');
-    throw new ApiError(httpStatus.NOT_FOUND, 'Stock correction not found');
-  }
-
-  if (stockCorrection.status !== 'PENDING') {
-    console.error('Stock correction already processed:', stockCorrection.status);
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      `Stock correction is already ${stockCorrection.status.toLowerCase()}`,
-    );
-  }
-
-  const result = await prisma.$transaction(async (tx) => {
-    console.log('Transaction started');
-    
-    // Get all unit of measures for the stock correction items
-    const unitOfMeasureIds = stockCorrection.items.map(
-      (item) => item.unitOfMeasureId,
-    );
-    console.log('Unit of measure IDs:', unitOfMeasureIds);
-
-    const unitOfMeasures = await tx.unitOfMeasure.findMany({
-      where: { id: { in: unitOfMeasureIds } },
-    });
-    console.log('Found unit of measures:', unitOfMeasures.length);
-
-    const unitOfMeasureMap = unitOfMeasures.reduce((acc, uom) => {
-      acc[uom.id] = uom;
-      return acc;
-    }, {});
-    console.log('Unit of measure map created:', Object.keys(unitOfMeasureMap).length);
-
-    // Check for negative stock BEFORE processing
-    const insufficientStockItems = [];
-    
-    console.log('Starting stock availability check...');
-    // For each item, check if there's enough stock for subtractions
-    for (const item of stockCorrection.items) {
-      console.log('Checking item:', {
-        itemId: item.id,
-        productId: item.productId,
-        batchId: item.batchId,
-        quantity: item.quantity
-      });
-      
-      const quantityToUse = item.quantity;
-      
-      // Only need to check for negative quantities (subtractions)
-      if (quantityToUse < 0) {
-        const absoluteQuantity = Math.abs(quantityToUse);
-        console.log('Item requires subtraction, checking stock availability. Required:', absoluteQuantity);
-        
-        if (stockCorrection.storeId) {
-          console.log('Checking store stock for store:', stockCorrection.storeId);
-          
-          // CORRECTED: StoreStock doesn't have productId, we need to get it through the batch
-          const storeStock = await tx.storeStock.findFirst({
-            where: {
-              storeId: stockCorrection.storeId,
-              batchId: item.batchId || 'no-batch',
-            },
-            include: {
-              batch: true  // Include batch to check productId
-            }
-          });
-          
-          console.log('Store stock query result:', storeStock);
-          
-          // Verify if this is the correct product
-          if (storeStock && storeStock.batch.productId !== item.productId) {
-            console.warn('Product ID mismatch:', {
-              expected: item.productId,
-              actual: storeStock.batch.productId
-            });
-            // Still use this stock as it's for the same batch
-          }
-          
-          const currentStock = storeStock?.quantity || 0;
-          console.log('Current stock:', currentStock, 'Required:', absoluteQuantity);
-          
-          if (currentStock < absoluteQuantity) {
-            console.error('Insufficient store stock!');
-            insufficientStockItems.push({
-              productId: item.productId,
-              batchId: item.batchId,
-              required: absoluteQuantity,
-              available: currentStock,
-              location: 'store',
-              locationId: stockCorrection.storeId
-            });
-          }
-          
-        } else if (stockCorrection.shopId) {
-          console.log('Checking shop stock for shop:', stockCorrection.shopId);
-          
-          // CORRECTED: ShopStock doesn't have productId, we need to get it through the batch
-          const shopStock = await tx.shopStock.findFirst({
-            where: {
-              shopId: stockCorrection.shopId,
-              batchId: item.batchId || 'no-batch',
-            },
-            include: {
-              batch: true  // Include batch to check productId
-            }
-          });
-          
-          console.log('Shop stock query result:', shopStock);
-          
-          // Verify if this is the correct product
-          if (shopStock && shopStock.batch.productId !== item.productId) {
-            console.warn('Product ID mismatch:', {
-              expected: item.productId,
-              actual: shopStock.batch.productId
-            });
-            // Still use this stock as it's for the same batch
-          }
-          
-          const currentStock = shopStock?.quantity || 0;
-          console.log('Current stock:', currentStock, 'Required:', absoluteQuantity);
-          
-          if (currentStock < absoluteQuantity) {
-            console.error('Insufficient shop stock!');
-            insufficientStockItems.push({
-              productId: item.productId,
-              batchId: item.batchId,
-              required: absoluteQuantity,
-              available: currentStock,
-              location: 'shop',
-              locationId: stockCorrection.shopId
-            });
-          }
-        }
-      } else {
-        console.log('Item is addition or zero, no stock check needed');
-      }
+    if (!stockCorrection) {
+      console.error('Stock correction not found');
+      throw new ApiError(httpStatus.NOT_FOUND, 'Stock correction not found');
     }
 
-    // If there are insufficient stock items, throw an error
-    if (insufficientStockItems.length > 0) {
-      console.error('Insufficient stock items found:', insufficientStockItems);
-      const errorDetails = insufficientStockItems.map(item => 
-        `Product ${item.productId} (Batch: ${item.batchId || 'N/A'}): Required ${item.required}, Available ${item.available}`
-      ).join('; ');
-      
+    if (stockCorrection.status !== 'PENDING') {
+      console.error(
+        'Stock correction already processed:',
+        stockCorrection.status,
+      );
       throw new ApiError(
         httpStatus.BAD_REQUEST,
-        `Insufficient stock for subtraction: ${errorDetails}`
+        `Stock correction is already ${stockCorrection.status.toLowerCase()}`,
       );
     }
 
-    console.log('Stock availability check passed, proceeding with operations...');
-
-    // Prepare all operations for each stock correction item
-    const operations = stockCorrection.items.map((item, index) => {
-      console.log(`Preparing operations for item ${index + 1}:`, {
-        productId: item.productId,
-        batchId: item.batchId,
-        quantity: item.quantity
-      });
-
-      const unitOfMeasure = unitOfMeasureMap[item.unitOfMeasureId];
-
-      if (!unitOfMeasure) {
-        console.error(`Unit of measure not found for item ${item.id}:`, item.unitOfMeasureId);
-        throw new ApiError(
-          httpStatus.BAD_REQUEST,
-          `Unit of measure not found for item ${item.id}`,
+    const result = await prisma.$transaction(async (tx) => {
+      try {
+        // Get all unit of measures for the stock correction items
+        const unitOfMeasureIds = stockCorrection.items.map(
+          (item) => item.unitOfMeasureId,
         );
+
+        const unitOfMeasures = await tx.unitOfMeasure.findMany({
+          where: { id: { in: unitOfMeasureIds } },
+        });
+
+        const unitOfMeasureMap = unitOfMeasures.reduce((acc, uom) => {
+          acc[uom.id] = uom;
+          return acc;
+        }, {});
+        // Check for negative stock BEFORE processing
+        const insufficientStockItems = [];
+
+        // For each item, check if there's enough stock for subtractions
+        await Promise.all(
+          stockCorrection.items.map(async (item) => {
+            try {
+              const quantityToUse = item.quantity;
+              const hasDimensions =
+                item.height && item.width && item.height > 0 && item.width > 0;
+
+              // Only need to check for negative quantities (subtractions)
+              if (quantityToUse < 0) {
+                const absoluteQuantity = Math.abs(quantityToUse);
+                if (stockCorrection.storeId) {
+                  const storeStock = await tx.storeStock.findUnique({
+                    where: {
+                      storeId_productId: {
+                        storeId: stockCorrection.storeId,
+                        productId: item.productId,
+                      },
+                    },
+                    include: {
+                      variants: true,
+                    },
+                  });
+
+                  if (hasDimensions) {
+                    // Check variant-specific stock
+                    const variant = storeStock?.variants?.find(
+                      (v) =>
+                        Math.abs(v.height - (item.height || 0)) < 0.01 &&
+                        Math.abs(v.width - (item.width || 0)) < 0.01,
+                    );
+
+                    const currentStock = variant?.quantity || 0;
+
+                    if (currentStock < absoluteQuantity) {
+                      insufficientStockItems.push({
+                        productId: item.productId,
+                        dimensions: `${item.height}x${item.width}`,
+                        required: absoluteQuantity,
+                        available: currentStock,
+                        location: 'store',
+                        locationId: stockCorrection.storeId,
+                      });
+                    }
+                  } else {
+                    const currentStock = storeStock?.quantity || 0;
+
+                    if (currentStock < absoluteQuantity) {
+                      insufficientStockItems.push({
+                        productId: item.productId,
+                        required: absoluteQuantity,
+                        available: currentStock,
+                        location: 'store',
+                        locationId: stockCorrection.storeId,
+                      });
+                    }
+                  }
+                } else if (stockCorrection.shopId) {
+                  const shopStock = await tx.shopStock.findUnique({
+                    where: {
+                      shopId_productId: {
+                        shopId: stockCorrection.shopId,
+                        productId: item.productId,
+                      },
+                    },
+                    include: {
+                      variants: true,
+                    },
+                  });
+
+                  if (hasDimensions) {
+                    // Check variant-specific stock
+                    const variant = shopStock?.variants?.find(
+                      (v) =>
+                        Math.abs(v.height - (item.height || 0)) < 0.01 &&
+                        Math.abs(v.width - (item.width || 0)) < 0.01,
+                    );
+
+                    const currentStock = variant?.quantity || 0;
+
+                    if (currentStock < absoluteQuantity) {
+                      insufficientStockItems.push({
+                        productId: item.productId,
+                        dimensions: `${item.height}x${item.width}`,
+                        required: absoluteQuantity,
+                        available: currentStock,
+                        location: 'shop',
+                        locationId: stockCorrection.shopId,
+                      });
+                    }
+                  } else {
+                    const currentStock = shopStock?.quantity || 0;
+
+                    if (currentStock < absoluteQuantity) {
+                      insufficientStockItems.push({
+                        productId: item.productId,
+                        required: absoluteQuantity,
+                        available: currentStock,
+                        location: 'shop',
+                        locationId: stockCorrection.shopId,
+                      });
+                    }
+                  }
+                }
+              } else {
+                console.log('Item is addition or zero, no stock check needed');
+              }
+            } catch (itemError) {
+              throw itemError;
+            }
+          }),
+        );
+
+        // If there are insufficient stock items, throw an error
+        if (insufficientStockItems.length > 0) {
+          const errorDetails = insufficientStockItems
+            .map(
+              (item) =>
+                `Product ${item.productId}${
+                  item.dimensions ? ` (${item.dimensions})` : ''
+                }: Required ${item.required}, Available ${item.available}`,
+            )
+            .join('; ');
+
+          throw new ApiError(
+            httpStatus.BAD_REQUEST,
+            `Insufficient stock for subtraction: ${errorDetails}`,
+          );
+        }
+
+        // Prepare all operations for each stock correction item
+        const operations = await Promise.all(
+          stockCorrection.items.map(async (item, index) => {
+            try {
+              const unitOfMeasure = unitOfMeasureMap[item.unitOfMeasureId];
+
+              if (!unitOfMeasure) {
+                throw new ApiError(
+                  httpStatus.BAD_REQUEST,
+                  `Unit of measure not found for item ${item.id}`,
+                );
+              }
+
+              const quantityToUse = item.quantity;
+              const isAddition = quantityToUse > 0;
+              const movementType = isAddition ? 'IN' : 'OUT';
+              const absoluteQuantity = Math.abs(quantityToUse);
+              const hasDimensions =
+                item.height && item.width && item.height > 0 && item.width > 0;
+              const notes = hasDimensions
+                ? `Stock correction: ${
+                    isAddition ? 'Added' : 'Removed'
+                  } ${absoluteQuantity} (${item.height}x${item.width}) - ${
+                    stockCorrection.reason
+                  }`
+                : `Stock correction: ${
+                    isAddition ? 'Added' : 'Removed'
+                  } ${absoluteQuantity} - ${stockCorrection.reason}`;
+
+              const itemOperations = [];
+
+              // Update stock based on location (store or shop)
+              if (stockCorrection.storeId) {
+                if (hasDimensions) {
+                  // Handle dimension-based store stock
+                  const storeStock = await tx.storeStock.findUnique({
+                    where: {
+                      storeId_productId: {
+                        storeId: stockCorrection.storeId,
+                        productId: item.productId,
+                      },
+                    },
+                  });
+
+                  if (!storeStock && !isAddition) {
+                    throw new ApiError(
+                      httpStatus.BAD_REQUEST,
+                      `Store stock not found for product ${item.productId}`,
+                    );
+                  }
+
+                  if (storeStock) {
+                    // Find or create the variant
+                    const existingVariant =
+                      await tx.storeProductVariant.findUnique({
+                        where: {
+                          storeStockId_height_width: {
+                            storeStockId: storeStock.id,
+                            height: item.height,
+                            width: item.width,
+                          },
+                        },
+                      });
+
+                    if (existingVariant) {
+                      // Update existing variant
+                      itemOperations.push(
+                        tx.storeProductVariant.update({
+                          where: { id: existingVariant.id },
+                          data: {
+                            quantity: isAddition
+                              ? { increment: absoluteQuantity }
+                              : { decrement: absoluteQuantity },
+                          },
+                        }),
+                      );
+                    } else {
+                      // Create new variant (only for additions)
+                      if (!isAddition) {
+                        throw new ApiError(
+                          httpStatus.BAD_REQUEST,
+                          `Cannot remove stock from non-existent variant ${item.height}x${item.width}`,
+                        );
+                      }
+                      itemOperations.push(
+                        tx.storeProductVariant.create({
+                          data: {
+                            storeStockId: storeStock.id,
+                            height: item.height,
+                            width: item.width,
+                            quantity: absoluteQuantity,
+                          },
+                        }),
+                      );
+                    }
+
+                    // Update total store stock quantity
+                    const allVariants = await tx.storeProductVariant.findMany({
+                      where: { storeStockId: storeStock.id },
+                    });
+
+                    const totalQuantity = allVariants.reduce(
+                      (sum, v) => sum + v.quantity,
+                      0,
+                    );
+
+                    itemOperations.push(
+                      tx.storeStock.update({
+                        where: { id: storeStock.id },
+                        data: { quantity: totalQuantity },
+                      }),
+                    );
+                  }
+                } else {
+                  // Handle quantity-based store stock
+                  itemOperations.push(
+                    tx.storeStock.upsert({
+                      where: {
+                        storeId_productId: {
+                          storeId: stockCorrection.storeId,
+                          productId: item.productId,
+                        },
+                      },
+                      update: {
+                        quantity: isAddition
+                          ? { increment: absoluteQuantity }
+                          : { decrement: absoluteQuantity },
+                      },
+                      create: {
+                        storeId: stockCorrection.storeId,
+                        productId: item.productId,
+                        quantity: isAddition ? absoluteQuantity : 0,
+                        unitOfMeasureId: item.unitOfMeasureId,
+                        status: 'Available',
+                      },
+                    }),
+                  );
+                }
+
+                // Create stock ledger entry for store
+                itemOperations.push(
+                  tx.stockLedger.create({
+                    data: {
+                      productId: item.productId,
+                      storeId: stockCorrection.storeId,
+                      invoiceNo: stockCorrection.shortCode,
+                      movementType: 'ADJUSTMENT',
+                      quantity: absoluteQuantity,
+                      ...(hasDimensions && {
+                        height: item.height,
+                        width: item.width,
+                      }),
+                      unitOfMeasureId: item.unitOfMeasureId,
+                      reference:
+                        stockCorrection.reference || stockCorrection.shortCode,
+                      userId,
+                      notes,
+                      movementDate: new Date(),
+                    },
+                  }),
+                );
+              } else if (stockCorrection.shopId) {
+                if (hasDimensions) {
+                  // Handle dimension-based shop stock
+                  const shopStock = await tx.shopStock.findUnique({
+                    where: {
+                      shopId_productId: {
+                        shopId: stockCorrection.shopId,
+                        productId: item.productId,
+                      },
+                    },
+                  });
+
+                  if (!shopStock && !isAddition) {
+                    throw new ApiError(
+                      httpStatus.BAD_REQUEST,
+                      `Shop stock not found for product ${item.productId}`,
+                    );
+                  }
+
+                  if (shopStock) {
+                    // Find or create the variant
+                    const existingVariant =
+                      await tx.shopProductVariant.findUnique({
+                        where: {
+                          shopStockId_height_width: {
+                            shopStockId: shopStock.id,
+                            height: item.height,
+                            width: item.width,
+                          },
+                        },
+                      });
+
+                    if (existingVariant) {
+                      // Update existing variant
+                      itemOperations.push(
+                        tx.shopProductVariant.update({
+                          where: { id: existingVariant.id },
+                          data: {
+                            quantity: isAddition
+                              ? { increment: absoluteQuantity }
+                              : { decrement: absoluteQuantity },
+                          },
+                        }),
+                      );
+                    } else {
+                      // Create new variant (only for additions)
+                      if (!isAddition) {
+                        throw new ApiError(
+                          httpStatus.BAD_REQUEST,
+                          `Cannot remove stock from non-existent variant ${item.height}x${item.width}`,
+                        );
+                      }
+                      itemOperations.push(
+                        tx.shopProductVariant.create({
+                          data: {
+                            shopStockId: shopStock.id,
+                            height: item.height,
+                            width: item.width,
+                            quantity: absoluteQuantity,
+                          },
+                        }),
+                      );
+                    }
+
+                    // Update total shop stock quantity
+                    const allVariants = await tx.shopProductVariant.findMany({
+                      where: { shopStockId: shopStock.id },
+                    });
+
+                    const totalQuantity = allVariants.reduce(
+                      (sum, v) => sum + v.quantity,
+                      0,
+                    );
+
+                    itemOperations.push(
+                      tx.shopStock.update({
+                        where: { id: shopStock.id },
+                        data: { quantity: totalQuantity },
+                      }),
+                    );
+                  }
+                } else {
+                  // Handle quantity-based shop stock
+                  itemOperations.push(
+                    tx.shopStock.upsert({
+                      where: {
+                        shopId_productId: {
+                          shopId: stockCorrection.shopId,
+                          productId: item.productId,
+                        },
+                      },
+                      update: {
+                        quantity: isAddition
+                          ? { increment: absoluteQuantity }
+                          : { decrement: absoluteQuantity },
+                      },
+                      create: {
+                        shopId: stockCorrection.shopId,
+                        productId: item.productId,
+                        quantity: isAddition ? absoluteQuantity : 0,
+                        unitOfMeasureId: item.unitOfMeasureId,
+                        status: 'Available',
+                      },
+                    }),
+                  );
+                }
+
+                // Create stock ledger entry for shop
+                itemOperations.push(
+                  tx.stockLedger.create({
+                    data: {
+                      productId: item.productId,
+                      invoiceNo: stockCorrection.shortCode,
+                      shopId: stockCorrection.shopId,
+                      movementType: 'ADJUSTMENT',
+                      quantity: absoluteQuantity,
+                      ...(hasDimensions && {
+                        height: item.height,
+                        width: item.width,
+                      }),
+                      unitOfMeasureId: item.unitOfMeasureId,
+                      reference:
+                        stockCorrection.reference || stockCorrection.shortCode,
+                      userId,
+                      notes,
+                      movementDate: new Date(),
+                    },
+                  }),
+                );
+              }
+
+              return itemOperations;
+            } catch (itemOpError) {
+              console.error(
+                `Error preparing operations for item ${index + 1}:`,
+                {
+                  itemId: item.id,
+                  productId: item.productId,
+                  error: itemOpError.message,
+                  stack: itemOpError.stack,
+                },
+              );
+              throw itemOpError;
+            }
+          }),
+        );
+
+        // Flatten all operations and execute them in parallel
+        const allOperations = operations.flat();
+
+        try {
+          const operationResults = await Promise.all(allOperations);
+          console.log(
+            'All operations completed successfully:',
+            operationResults.length,
+          );
+        } catch (error) {
+          console.error('Error executing operations:', {
+            error: error.message,
+            stack: error.stack,
+            code: error.code,
+            meta: error.meta,
+          });
+          throw error;
+        }
+
+        // Update stock correction status to APPROVED
+        const updatedStockCorrection = await tx.stockCorrection.update({
+          where: { id: stockCorrectionId },
+          data: {
+            status: 'APPROVED',
+            approvedBy: {
+              connect: { id: userId },
+            },
+            updatedBy: {
+              connect: { id: userId },
+            },
+          },
+        });
+
+        // Create log entry
+        await tx.log.create({
+          data: {
+            action: `Approved stock correction ${
+              stockCorrection.reference || stockCorrection.shortCode
+            } with ${stockCorrection.items.length} items`,
+            userId,
+          },
+        });
+
+        return updatedStockCorrection;
+      } catch (transactionError) {
+        console.error('Transaction error:', {
+          error: transactionError.message,
+          stack: transactionError.stack,
+          code: transactionError.code,
+          meta: transactionError.meta,
+        });
+        throw transactionError;
       }
-
-      const quantityToUse = item.quantity;
-      const isAddition = quantityToUse > 0;
-      const movementType = isAddition ? 'IN' : 'OUT';
-      const absoluteQuantity = Math.abs(quantityToUse);
-      const notes = isAddition
-        ? `Stock addition: ${stockCorrection.reason.toLowerCase()}`
-        : `Stock subtraction: ${stockCorrection.reason.toLowerCase()}`;
-
-      console.log(`Item operation details:`, {
-        isAddition,
-        movementType,
-        absoluteQuantity,
-        notes
-      });
-
-      const itemOperations = [];
-
-      // Update stock based on location (store or shop)
-      if (stockCorrection.storeId) {
-        console.log(`Creating store stock operation for store: ${stockCorrection.storeId}`);
-        itemOperations.push(
-          tx.storeStock.upsert({
-            where: {
-              storeId_batchId: {
-                storeId: stockCorrection.storeId,
-                batchId: item.batchId || 'no-batch',
-              },
-            },
-            update: {
-              quantity: isAddition
-                ? { increment: absoluteQuantity }
-                : { decrement: absoluteQuantity },
-            },
-            create: {
-              storeId: stockCorrection.storeId,
-              batchId: item.batchId || 'no-batch',
-              quantity: isAddition ? absoluteQuantity : -absoluteQuantity,
-              unitOfMeasureId: item.unitOfMeasureId,
-              status: 'Available',
-            },
-          }),
-        );
-      } else if (stockCorrection.shopId) {
-        console.log(`Creating shop stock operation for shop: ${stockCorrection.shopId}`);
-        itemOperations.push(
-          tx.shopStock.upsert({
-            where: {
-              shopId_batchId: {
-                shopId: stockCorrection.shopId,
-                batchId: item.batchId || 'no-batch',
-              },
-            },
-            update: {
-              quantity: isAddition
-                ? { increment: absoluteQuantity }
-                : { decrement: absoluteQuantity },
-            },
-            create: {
-              shopId: stockCorrection.shopId,
-              batchId: item.batchId || 'no-batch',
-              quantity: isAddition ? absoluteQuantity : -absoluteQuantity,
-              unitOfMeasureId: item.unitOfMeasureId,
-              status: 'Available',
-            },
-          }),
-        );
-      }
-
-      // Create stock ledger entry
-      if (stockCorrection.storeId) {
-        console.log(`Creating stock ledger for store: ${stockCorrection.storeId}`);
-        itemOperations.push(
-          tx.stockLedger.create({
-            data: {
-              batchId: item.batchId,
-              storeId: stockCorrection.storeId,
-              invoiceNo: stockCorrection.shortCode,
-              movementType,
-              quantity: absoluteQuantity,
-              unitOfMeasureId: item.unitOfMeasureId,
-              reference:
-                stockCorrection.reference ||
-                `STOCK-CORRECTION-${stockCorrection.reason}`,
-              userId,
-              notes,
-              movementDate: new Date(),
-            },
-          }),
-        );
-      } else if (stockCorrection.shopId) {
-        console.log(`Creating stock ledger for shop: ${stockCorrection.shopId}`);
-        itemOperations.push(
-          tx.stockLedger.create({
-            data: {
-              batchId: item.batchId,
-              invoiceNo: stockCorrection.shortCode,
-              shopId: stockCorrection.shopId,
-              movementType,
-              quantity: absoluteQuantity,
-              unitOfMeasureId: item.unitOfMeasureId,
-              reference:
-                stockCorrection.reference ||
-                `SHOP-CORRECTION-${stockCorrection.reason}`,
-              userId,
-              notes,
-              movementDate: new Date(),
-            },
-          }),
-        );
-      }
-
-      console.log(`Item ${index + 1} operations prepared:`, itemOperations.length);
-      return itemOperations;
     });
 
-    // Flatten all operations and execute them in parallel
-    const allOperations = operations.flat();
-    console.log(`Executing ${allOperations.length} operations in parallel...`);
-
-    try {
-      const operationResults = await Promise.all(allOperations);
-      console.log('All operations completed successfully:', operationResults.length);
-    } catch (error) {
-      console.error('Error executing operations:', error);
-      throw error;
-    }
-
-    // Update stock correction status to APPROVED
-    console.log('Updating stock correction status to APPROVED...');
-    const updatedStockCorrection = await tx.stockCorrection.update({
-      where: { id: stockCorrectionId },
-      data: {
-        status: 'APPROVED',
-        updatedById: userId,
-      },
+    return result;
+  } catch (error) {
+    console.error('FATAL ERROR in approveStockCorrection:', {
+      error: error.message,
+      stack: error.stack,
+      stockCorrectionId,
+      userId,
+      httpStatus: error.statusCode || error.status || 'unknown',
+      code: error.code,
+      meta: error.meta,
     });
 
-    // Create log entry
-    console.log('Creating log entry...');
-    await tx.log.create({
-      data: {
-        action: `Approved stock correction ${
-          stockCorrection.reference || stockCorrection.id
-        } with ${stockCorrection.items.length} items`,
-        userId,
-      },
-    });
-
-    console.log('Transaction completed successfully');
-    return updatedStockCorrection;
-  });
-
-  console.log('Stock correction approved successfully');
-  return result;
+    // Re-throw the error to be handled by the calling function
+    throw error;
+  }
 };
 
 // Reject StockCorrection

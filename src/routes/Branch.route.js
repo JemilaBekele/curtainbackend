@@ -49,5 +49,9 @@ router.delete(
   checkPermission('DELETE_BRANCH'),
   branchController.deleteBranch,
 );
-
+router.get(
+  '/api/curtain-orders/estimated/delivery/date',
+  auth,
+  branchController.getEstimatedCurtainDeliveryTime,
+);
 module.exports = router;

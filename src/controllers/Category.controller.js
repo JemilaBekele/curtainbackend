@@ -33,48 +33,6 @@ const getCategories = catchAsync(async (req, res) => {
     ...result,
   });
 });
-const getAllSubCategories = catchAsync(async (req, res) => {
-  const result = await categoryService.getAllSubCategories();
-
-  res.status(httpStatus.OK).send({
-    success: true,
-    ...result,
-  });
-});
-const getProductsBySubCategory = catchAsync(async (req, res) => {
-  const { subCategoryId } = req.params;
-
-  const result = await categoryService.getProductsBySubCategoryId(
-    subCategoryId,
-  );
-
-  res.status(httpStatus.OK).send({
-    success: true,
-    message: 'Products fetched successfully',
-    ...result,
-  });
-});
-
-const getProductsBySubCategoryName = catchAsync(async (req, res) => {
-  const { categoryId } = req.params;
-
-  // First get the subcategory by name and category
-  const subCategory = await categoryService.getSubCategoriesByCategory(
-    categoryId,
-  );
-console.log("subcategory", subCategory);
-  if (!subCategory) {
-    return res.status(httpStatus.NOT_FOUND).send({
-      success: false,
-      message: 'Subcategory not found',
-    });
-  }
-  res.status(httpStatus.OK).send({
-    success: true,
-    message: 'Products fetched successfully',
-    ...subCategory,
-  });
-});
 
 // Update Category
 const updateCategory = catchAsync(async (req, res) => {
@@ -98,58 +56,69 @@ const deleteCategory = catchAsync(async (req, res) => {
   });
 });
 
-// SubCategory Controllers
+const createColour = catchAsync(async (req, res) => {
+  const colour = await categoryService.createColour(req.body);
 
-// Create SubCategory
-const createSubCategory = catchAsync(async (req, res) => {
-  const subCategory = await categoryService.createSubCategory(req.body);
   res.status(httpStatus.CREATED).send({
     success: true,
-    message: 'SubCategory created successfully',
-    subCategory,
+    message: 'Colour created successfully',
+    colour,
   });
 });
 
-// Get SubCategory by ID
-const getSubCategory = catchAsync(async (req, res) => {
-  const subCategory = await categoryService.getSubCategoryById(req.params.id);
-  if (!subCategory) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'SubCategory not found');
+// Get Colour by ID
+const getColour = catchAsync(async (req, res) => {
+  const colour = await categoryService.getColourById(req.params.id);
+  if (!colour) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Colour not found');
   }
+
   res.status(httpStatus.OK).send({
     success: true,
-    subCategory,
+    colour,
   });
 });
 
-// Get SubCategories by Category ID
-const getSubCategoriesByCategory = catchAsync(async (req, res) => {
-  const result = await categoryService.getSubCategoriesByCategory();
+// Get all Colours (with pagination & filtering)
+const getColours = catchAsync(async (req, res) => {
+  const filter = {
+    name: req.query.name,
+  };
+
+  const options = {
+    sortBy: req.query.sortBy,
+    order: req.query.order,
+    page: Number(req.query.page),
+    limit: Number(req.query.limit),
+  };
+
+  const result = await categoryService.getAllColours(filter, options);
+
   res.status(httpStatus.OK).send({
     success: true,
     ...result,
   });
 });
 
-// Update SubCategory
-const updateSubCategory = catchAsync(async (req, res) => {
-  const subCategory = await categoryService.updateSubCategory(
-    req.params.id,
-    req.body,
-  );
+// Update Colour
+const updateColour = catchAsync(async (req, res) => {
+  const colour = await categoryService.updateColour(req.params.id, req.body);
+
   res.status(httpStatus.OK).send({
     success: true,
-    message: 'SubCategory updated successfully',
-    subCategory,
+    message: 'Colour updated successfully',
+    colour,
   });
 });
 
-// Delete SubCategory
-const deleteSubCategory = catchAsync(async (req, res) => {
-  await categoryService.deleteSubCategory(req.params.id);
+// Delete Colour
+const deleteColour = catchAsync(async (req, res) => {
+  const result = await categoryService.deleteColour(req.params.id);
+
   res.status(httpStatus.OK).send({
     success: true,
-    message: 'SubCategory deleted successfully',
+    message: result.message,
+    deletedColour: result.deletedColour,
   });
 });
 
@@ -159,12 +128,9 @@ module.exports = {
   getCategories,
   updateCategory,
   deleteCategory,
-  createSubCategory,
-  getSubCategory,
-  getSubCategoriesByCategory,
-  updateSubCategory,
-  deleteSubCategory,
-  getProductsBySubCategory,
-  getProductsBySubCategoryName,
-  getAllSubCategories,
+  createColour,
+  getColour,
+  getColours,
+  updateColour,
+  deleteColour,
 };

@@ -204,18 +204,26 @@ exports.Prisma.StoreScalarFieldEnum = {
 exports.Prisma.StoreStockScalarFieldEnum = {
   id: 'id',
   storeId: 'storeId',
-  batchId: 'batchId',
+  productId: 'productId',
   quantity: 'quantity',
   status: 'status',
   unitOfMeasureId: 'unitOfMeasureId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
+};
+
+exports.Prisma.StoreProductVariantScalarFieldEnum = {
+  id: 'id',
+  storeStockId: 'storeStockId',
+  height: 'height',
+  width: 'width',
+  quantity: 'quantity'
 };
 
 exports.Prisma.ShopStockScalarFieldEnum = {
   id: 'id',
   shopId: 'shopId',
-  batchId: 'batchId',
+  productId: 'productId',
   unitOfMeasureId: 'unitOfMeasureId',
   quantity: 'quantity',
   status: 'status',
@@ -223,13 +231,23 @@ exports.Prisma.ShopStockScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.ShopProductVariantScalarFieldEnum = {
+  id: 'id',
+  shopStockId: 'shopStockId',
+  height: 'height',
+  width: 'width',
+  quantity: 'quantity'
+};
+
 exports.Prisma.StockLedgerScalarFieldEnum = {
   id: 'id',
   invoiceNo: 'invoiceNo',
-  batchId: 'batchId',
+  productId: 'productId',
   storeId: 'storeId',
   shopId: 'shopId',
   movementType: 'movementType',
+  height: 'height',
+  width: 'width',
   quantity: 'quantity',
   unitOfMeasureId: 'unitOfMeasureId',
   reference: 'reference',
@@ -282,10 +300,23 @@ exports.Prisma.CategoryScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
-exports.Prisma.SubCategoryScalarFieldEnum = {
+exports.Prisma.ColourScalarFieldEnum = {
   id: 'id',
   name: 'name',
-  categoryId: 'categoryId',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.CurtainTypeScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.MovementTypeScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };
@@ -294,11 +325,20 @@ exports.Prisma.ProductScalarFieldEnum = {
   id: 'id',
   productCode: 'productCode',
   name: 'name',
-  generic: 'generic',
   description: 'description',
+  fabricName: 'fabricName',
+  thickCurtain: 'thickCurtain',
+  thinCurtain: 'thinCurtain',
+  pullsCurtain: 'pullsCurtain',
+  poleCurtain: 'poleCurtain',
+  bracketsCurtain: 'bracketsCurtain',
+  shatterVertical: 'shatterVertical',
   categoryId: 'categoryId',
-  subCategoryId: 'subCategoryId',
+  colourId: 'colourId',
+  curtainTypeId: 'curtainTypeId',
   sellPrice: 'sellPrice',
+  pricePerMeter: 'pricePerMeter',
+  warningQuantity: 'warningQuantity',
   imageUrl: 'imageUrl',
   unitOfMeasureId: 'unitOfMeasureId',
   isActive: 'isActive',
@@ -316,24 +356,96 @@ exports.Prisma.AdditionalPriceScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
-exports.Prisma.ProductBatchScalarFieldEnum = {
-  id: 'id',
-  batchNumber: 'batchNumber',
-  expiryDate: 'expiryDate',
-  productId: 'productId',
-  price: 'price',
-  stock: 'stock',
-  warningQuantity: 'warningQuantity',
-  storeId: 'storeId',
-  createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
-};
-
 exports.Prisma.UnitOfMeasureScalarFieldEnum = {
   id: 'id',
   name: 'name',
   symbol: 'symbol',
   base: 'base'
+};
+
+exports.Prisma.CurtainOrderScalarFieldEnum = {
+  id: 'id',
+  code: 'code',
+  customerId: 'customerId',
+  movementTypeId: 'movementTypeId',
+  curtainStatus: 'curtainStatus',
+  paymentStatus: 'paymentStatus',
+  isSiteMeasured: 'isSiteMeasured',
+  siteMeasurePrice: 'siteMeasurePrice',
+  remark: 'remark',
+  issueDate: 'issueDate',
+  createdById: 'createdById',
+  updatedById: 'updatedById',
+  deliveryDeadline: 'deliveryDeadline',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  totalAmount: 'totalAmount',
+  balance: 'balance',
+  totalPaid: 'totalPaid',
+  ShopId: 'ShopId'
+};
+
+exports.Prisma.CurtainMeasurementScalarFieldEnum = {
+  id: 'id',
+  orderId: 'orderId',
+  roomName: 'roomName',
+  width: 'width',
+  height: 'height',
+  quantity: 'quantity',
+  pricePerUnit: 'pricePerUnit',
+  unitprice: 'unitprice',
+  price: 'price',
+  remark: 'remark',
+  size: 'size',
+  createdById: 'createdById',
+  shatterVerticalProductId: 'shatterVerticalProductId',
+  curtainSize: 'curtainSize',
+  thickProductId: 'thickProductId',
+  thickVariant: 'thickVariant',
+  thickMeter: 'thickMeter',
+  thickPrice: 'thickPrice',
+  thinProductId: 'thinProductId',
+  thinVariant: 'thinVariant',
+  thinMeter: 'thinMeter',
+  thinPrice: 'thinPrice',
+  curtainPoleId: 'curtainPoleId',
+  curtainPoleQuantity: 'curtainPoleQuantity',
+  curtainPolePrice: 'curtainPolePrice',
+  curtainPullsId: 'curtainPullsId',
+  curtainPullsQuantity: 'curtainPullsQuantity',
+  curtainBracketsId: 'curtainBracketsId',
+  curtainBracketsQuantity: 'curtainBracketsQuantity',
+  curtainPullsBracketsPrice: 'curtainPullsBracketsPrice',
+  thickWorkerId: 'thickWorkerId',
+  thickWorkerPaid: 'thickWorkerPaid',
+  thickWorkerPaidDate: 'thickWorkerPaidDate',
+  thickWorkerPaidAmount: 'thickWorkerPaidAmount',
+  thinWorkerId: 'thinWorkerId',
+  thinWorkerPaid: 'thinWorkerPaid',
+  thinWorkerPaidDate: 'thinWorkerPaidDate',
+  thinWorkerPaidAmount: 'thinWorkerPaidAmount',
+  workerPrice: 'workerPrice',
+  totalWorkerMeter: 'totalWorkerMeter',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.CurtainWorkerLogScalarFieldEnum = {
+  id: 'id',
+  status: 'status',
+  curtainMeasurementId: 'curtainMeasurementId',
+  shopProductVariantId: 'shopProductVariantId',
+  workerId: 'workerId',
+  workerType: 'workerType',
+  widthmeterAssigned: 'widthmeterAssigned',
+  heightmeterAssigned: 'heightmeterAssigned',
+  quantityAssigned: 'quantityAssigned',
+  heightmeterCompleted: 'heightmeterCompleted',
+  widthmeterCompleted: 'widthmeterCompleted',
+  quantityCompleted: 'quantityCompleted',
+  note: 'note',
+  createdById: 'createdById',
+  createdAt: 'createdAt'
 };
 
 exports.Prisma.PurchaseScalarFieldEnum = {
@@ -357,8 +469,9 @@ exports.Prisma.PurchaseItemScalarFieldEnum = {
   id: 'id',
   purchaseId: 'purchaseId',
   productId: 'productId',
-  batchId: 'batchId',
   unitOfMeasureId: 'unitOfMeasureId',
+  height: 'height',
+  width: 'width',
   quantity: 'quantity',
   unitPrice: 'unitPrice',
   totalPrice: 'totalPrice',
@@ -389,8 +502,9 @@ exports.Prisma.TransferItemScalarFieldEnum = {
   id: 'id',
   transferId: 'transferId',
   productId: 'productId',
-  batchId: 'batchId',
   unitOfMeasureId: 'unitOfMeasureId',
+  height: 'height',
+  width: 'width',
   quantity: 'quantity',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
@@ -408,6 +522,7 @@ exports.Prisma.StockCorrectionScalarFieldEnum = {
   reference: 'reference',
   notes: 'notes',
   createdById: 'createdById',
+  approvedById: 'approvedById',
   updatedById: 'updatedById',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
@@ -417,137 +532,12 @@ exports.Prisma.StockCorrectionItemScalarFieldEnum = {
   id: 'id',
   correctionId: 'correctionId',
   productId: 'productId',
-  batchId: 'batchId',
   unitOfMeasureId: 'unitOfMeasureId',
+  height: 'height',
+  width: 'width',
   quantity: 'quantity',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
-};
-
-exports.Prisma.SellScalarFieldEnum = {
-  id: 'id',
-  invoiceNo: 'invoiceNo',
-  saleStatus: 'saleStatus',
-  locked: 'locked',
-  lockedAt: 'lockedAt',
-  branchId: 'branchId',
-  customerId: 'customerId',
-  totalProducts: 'totalProducts',
-  subTotal: 'subTotal',
-  discount: 'discount',
-  vat: 'vat',
-  grandTotal: 'grandTotal',
-  NetTotal: 'NetTotal',
-  notes: 'notes',
-  saleDate: 'saleDate',
-  createdById: 'createdById',
-  updatedById: 'updatedById',
-  createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
-};
-
-exports.Prisma.SellItemScalarFieldEnum = {
-  id: 'id',
-  sellId: 'sellId',
-  productId: 'productId',
-  shopId: 'shopId',
-  unitOfMeasureId: 'unitOfMeasureId',
-  itemSaleStatus: 'itemSaleStatus',
-  quantity: 'quantity',
-  unitPrice: 'unitPrice',
-  totalPrice: 'totalPrice',
-  createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
-};
-
-exports.Prisma.SellItemBatchScalarFieldEnum = {
-  id: 'id',
-  sellItemId: 'sellItemId',
-  batchId: 'batchId',
-  quantity: 'quantity'
-};
-
-exports.Prisma.AddToCartScalarFieldEnum = {
-  id: 'id',
-  userId: 'userId',
-  branchId: 'branchId',
-  isCheckedOut: 'isCheckedOut',
-  isWaitlist: 'isWaitlist',
-  discount: 'discount',
-  notes: 'notes',
-  customerId: 'customerId',
-  totalItems: 'totalItems',
-  totalAmount: 'totalAmount',
-  createdById: 'createdById',
-  updatedById: 'updatedById',
-  createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
-};
-
-exports.Prisma.CartItemScalarFieldEnum = {
-  id: 'id',
-  cartId: 'cartId',
-  isWaitlist: 'isWaitlist',
-  shopId: 'shopId',
-  productId: 'productId',
-  unitOfMeasureId: 'unitOfMeasureId',
-  quantity: 'quantity',
-  unitPrice: 'unitPrice',
-  totalPrice: 'totalPrice',
-  notes: 'notes',
-  createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
-};
-
-exports.Prisma.WaitlistScalarFieldEnum = {
-  id: 'id',
-  userId: 'userId',
-  customerId: 'customerId',
-  branchId: 'branchId',
-  cartId: 'cartId',
-  cartItemId: 'cartItemId',
-  productId: 'productId',
-  quantity: 'quantity',
-  note: 'note',
-  shopId: 'shopId',
-  createdById: 'createdById',
-  updatedById: 'updatedById',
-  createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
-};
-
-exports.Prisma.SellStockCorrectionScalarFieldEnum = {
-  id: 'id',
-  sellId: 'sellId',
-  status: 'status',
-  reference: 'reference',
-  notes: 'notes',
-  createdById: 'createdById',
-  updatedById: 'updatedById',
-  total: 'total',
-  createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
-};
-
-exports.Prisma.SellStockCorrectionItemScalarFieldEnum = {
-  id: 'id',
-  correctionId: 'correctionId',
-  productId: 'productId',
-  shopId: 'shopId',
-  unitOfMeasureId: 'unitOfMeasureId',
-  quantity: 'quantity',
-  unitPrice: 'unitPrice',
-  totalPrice: 'totalPrice',
-  itemSaleStatus: 'itemSaleStatus',
-  createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
-};
-
-exports.Prisma.SellStockCorrectionBatchScalarFieldEnum = {
-  id: 'id',
-  correctionItemId: 'correctionItemId',
-  batchId: 'batchId',
-  quantity: 'quantity'
 };
 
 exports.Prisma.NotificationScalarFieldEnum = {
@@ -639,21 +629,31 @@ exports.Prisma.StoreOrderByRelevanceFieldEnum = {
 exports.Prisma.StoreStockOrderByRelevanceFieldEnum = {
   id: 'id',
   storeId: 'storeId',
-  batchId: 'batchId',
+  productId: 'productId',
   unitOfMeasureId: 'unitOfMeasureId'
+};
+
+exports.Prisma.StoreProductVariantOrderByRelevanceFieldEnum = {
+  id: 'id',
+  storeStockId: 'storeStockId'
 };
 
 exports.Prisma.ShopStockOrderByRelevanceFieldEnum = {
   id: 'id',
   shopId: 'shopId',
-  batchId: 'batchId',
+  productId: 'productId',
   unitOfMeasureId: 'unitOfMeasureId'
+};
+
+exports.Prisma.ShopProductVariantOrderByRelevanceFieldEnum = {
+  id: 'id',
+  shopStockId: 'shopStockId'
 };
 
 exports.Prisma.StockLedgerOrderByRelevanceFieldEnum = {
   id: 'id',
   invoiceNo: 'invoiceNo',
-  batchId: 'batchId',
+  productId: 'productId',
   storeId: 'storeId',
   shopId: 'shopId',
   unitOfMeasureId: 'unitOfMeasureId',
@@ -696,20 +696,30 @@ exports.Prisma.CategoryOrderByRelevanceFieldEnum = {
   name: 'name'
 };
 
-exports.Prisma.SubCategoryOrderByRelevanceFieldEnum = {
+exports.Prisma.ColourOrderByRelevanceFieldEnum = {
   id: 'id',
-  name: 'name',
-  categoryId: 'categoryId'
+  name: 'name'
+};
+
+exports.Prisma.CurtainTypeOrderByRelevanceFieldEnum = {
+  id: 'id',
+  name: 'name'
+};
+
+exports.Prisma.MovementTypeOrderByRelevanceFieldEnum = {
+  id: 'id',
+  name: 'name'
 };
 
 exports.Prisma.ProductOrderByRelevanceFieldEnum = {
   id: 'id',
   productCode: 'productCode',
   name: 'name',
-  generic: 'generic',
   description: 'description',
+  fabricName: 'fabricName',
   categoryId: 'categoryId',
-  subCategoryId: 'subCategoryId',
+  colourId: 'colourId',
+  curtainTypeId: 'curtainTypeId',
   imageUrl: 'imageUrl',
   unitOfMeasureId: 'unitOfMeasureId'
 };
@@ -721,17 +731,48 @@ exports.Prisma.AdditionalPriceOrderByRelevanceFieldEnum = {
   shopId: 'shopId'
 };
 
-exports.Prisma.ProductBatchOrderByRelevanceFieldEnum = {
-  id: 'id',
-  batchNumber: 'batchNumber',
-  productId: 'productId',
-  storeId: 'storeId'
-};
-
 exports.Prisma.UnitOfMeasureOrderByRelevanceFieldEnum = {
   id: 'id',
   name: 'name',
   symbol: 'symbol'
+};
+
+exports.Prisma.CurtainOrderOrderByRelevanceFieldEnum = {
+  id: 'id',
+  code: 'code',
+  customerId: 'customerId',
+  movementTypeId: 'movementTypeId',
+  remark: 'remark',
+  createdById: 'createdById',
+  updatedById: 'updatedById',
+  ShopId: 'ShopId'
+};
+
+exports.Prisma.CurtainMeasurementOrderByRelevanceFieldEnum = {
+  id: 'id',
+  orderId: 'orderId',
+  roomName: 'roomName',
+  remark: 'remark',
+  createdById: 'createdById',
+  shatterVerticalProductId: 'shatterVerticalProductId',
+  thickProductId: 'thickProductId',
+  thickVariant: 'thickVariant',
+  thinProductId: 'thinProductId',
+  thinVariant: 'thinVariant',
+  curtainPoleId: 'curtainPoleId',
+  curtainPullsId: 'curtainPullsId',
+  curtainBracketsId: 'curtainBracketsId',
+  thickWorkerId: 'thickWorkerId',
+  thinWorkerId: 'thinWorkerId'
+};
+
+exports.Prisma.CurtainWorkerLogOrderByRelevanceFieldEnum = {
+  id: 'id',
+  curtainMeasurementId: 'curtainMeasurementId',
+  shopProductVariantId: 'shopProductVariantId',
+  workerId: 'workerId',
+  note: 'note',
+  createdById: 'createdById'
 };
 
 exports.Prisma.PurchaseOrderByRelevanceFieldEnum = {
@@ -748,7 +789,6 @@ exports.Prisma.PurchaseItemOrderByRelevanceFieldEnum = {
   id: 'id',
   purchaseId: 'purchaseId',
   productId: 'productId',
-  batchId: 'batchId',
   unitOfMeasureId: 'unitOfMeasureId'
 };
 
@@ -769,7 +809,6 @@ exports.Prisma.TransferItemOrderByRelevanceFieldEnum = {
   id: 'id',
   transferId: 'transferId',
   productId: 'productId',
-  batchId: 'batchId',
   unitOfMeasureId: 'unitOfMeasureId'
 };
 
@@ -783,6 +822,7 @@ exports.Prisma.StockCorrectionOrderByRelevanceFieldEnum = {
   reference: 'reference',
   notes: 'notes',
   createdById: 'createdById',
+  approvedById: 'approvedById',
   updatedById: 'updatedById'
 };
 
@@ -790,88 +830,7 @@ exports.Prisma.StockCorrectionItemOrderByRelevanceFieldEnum = {
   id: 'id',
   correctionId: 'correctionId',
   productId: 'productId',
-  batchId: 'batchId',
   unitOfMeasureId: 'unitOfMeasureId'
-};
-
-exports.Prisma.SellOrderByRelevanceFieldEnum = {
-  id: 'id',
-  invoiceNo: 'invoiceNo',
-  branchId: 'branchId',
-  customerId: 'customerId',
-  notes: 'notes',
-  createdById: 'createdById',
-  updatedById: 'updatedById'
-};
-
-exports.Prisma.SellItemOrderByRelevanceFieldEnum = {
-  id: 'id',
-  sellId: 'sellId',
-  productId: 'productId',
-  shopId: 'shopId',
-  unitOfMeasureId: 'unitOfMeasureId'
-};
-
-exports.Prisma.SellItemBatchOrderByRelevanceFieldEnum = {
-  id: 'id',
-  sellItemId: 'sellItemId',
-  batchId: 'batchId'
-};
-
-exports.Prisma.AddToCartOrderByRelevanceFieldEnum = {
-  id: 'id',
-  userId: 'userId',
-  branchId: 'branchId',
-  notes: 'notes',
-  customerId: 'customerId',
-  createdById: 'createdById',
-  updatedById: 'updatedById'
-};
-
-exports.Prisma.CartItemOrderByRelevanceFieldEnum = {
-  id: 'id',
-  cartId: 'cartId',
-  shopId: 'shopId',
-  productId: 'productId',
-  unitOfMeasureId: 'unitOfMeasureId',
-  notes: 'notes'
-};
-
-exports.Prisma.WaitlistOrderByRelevanceFieldEnum = {
-  id: 'id',
-  userId: 'userId',
-  customerId: 'customerId',
-  branchId: 'branchId',
-  cartId: 'cartId',
-  cartItemId: 'cartItemId',
-  productId: 'productId',
-  note: 'note',
-  shopId: 'shopId',
-  createdById: 'createdById',
-  updatedById: 'updatedById'
-};
-
-exports.Prisma.SellStockCorrectionOrderByRelevanceFieldEnum = {
-  id: 'id',
-  sellId: 'sellId',
-  reference: 'reference',
-  notes: 'notes',
-  createdById: 'createdById',
-  updatedById: 'updatedById'
-};
-
-exports.Prisma.SellStockCorrectionItemOrderByRelevanceFieldEnum = {
-  id: 'id',
-  correctionId: 'correctionId',
-  productId: 'productId',
-  shopId: 'shopId',
-  unitOfMeasureId: 'unitOfMeasureId'
-};
-
-exports.Prisma.SellStockCorrectionBatchOrderByRelevanceFieldEnum = {
-  id: 'id',
-  correctionItemId: 'correctionItemId',
-  batchId: 'batchId'
 };
 
 exports.Prisma.NotificationOrderByRelevanceFieldEnum = {
@@ -905,10 +864,35 @@ exports.StockMovementType = exports.$Enums.StockMovementType = {
   RETERN: 'RETERN'
 };
 
+exports.CurtainStatus = exports.$Enums.CurtainStatus = {
+  PENDING: 'PENDING',
+  COMPLETED: 'COMPLETED',
+  CANCELLED: 'CANCELLED',
+  DELIVERED: 'DELIVERED'
+};
+
 exports.PaymentStatus = exports.$Enums.PaymentStatus = {
+  PAID: 'PAID',
   PENDING: 'PENDING',
   APPROVED: 'APPROVED',
   REJECTED: 'REJECTED'
+};
+
+exports.ProductSize = exports.$Enums.ProductSize = {
+  TWO_POINT_FIVE: 'TWO_POINT_FIVE',
+  THREE: 'THREE',
+  NORMAL: 'NORMAL'
+};
+
+exports.CurtainWorkerLogStatus = exports.$Enums.CurtainWorkerLogStatus = {
+  PENDING: 'PENDING',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED'
+};
+
+exports.CurtainWorkerType = exports.$Enums.CurtainWorkerType = {
+  THICK: 'THICK',
+  THIN: 'THIN'
 };
 
 exports.TransferEntityType = exports.$Enums.TransferEntityType = {
@@ -936,29 +920,10 @@ exports.StockCorrectionStatus = exports.$Enums.StockCorrectionStatus = {
   REJECTED: 'REJECTED'
 };
 
-exports.SaleStatus = exports.$Enums.SaleStatus = {
-  NOT_APPROVED: 'NOT_APPROVED',
-  PARTIALLY_DELIVERED: 'PARTIALLY_DELIVERED',
-  APPROVED: 'APPROVED',
-  DELIVERED: 'DELIVERED',
-  CANCELLED: 'CANCELLED'
-};
-
-exports.ItemSaleStatus = exports.$Enums.ItemSaleStatus = {
-  PENDING: 'PENDING',
-  DELIVERED: 'DELIVERED'
-};
-
-exports.SellStockCorrectionStatus = exports.$Enums.SellStockCorrectionStatus = {
-  PENDING: 'PENDING',
-  APPROVED: 'APPROVED',
-  PARTIAL: 'PARTIAL',
-  REJECTED: 'REJECTED'
-};
-
 exports.NotificationType = exports.$Enums.NotificationType = {
   SELL_READY_FOR_DELIVERY: 'SELL_READY_FOR_DELIVERY',
   SELL_CANCELLED: 'SELL_CANCELLED',
+  Done: 'Done',
   Payment: 'Payment',
   Inventory: 'Inventory',
   System: 'System',
@@ -983,32 +948,29 @@ exports.Prisma.ModelName = {
   Shop: 'Shop',
   Store: 'Store',
   StoreStock: 'StoreStock',
+  StoreProductVariant: 'StoreProductVariant',
   ShopStock: 'ShopStock',
+  ShopProductVariant: 'ShopProductVariant',
   StockLedger: 'StockLedger',
   Log: 'Log',
   Customer: 'Customer',
   Supplier: 'Supplier',
   Category: 'Category',
-  SubCategory: 'SubCategory',
+  Colour: 'Colour',
+  CurtainType: 'CurtainType',
+  MovementType: 'MovementType',
   Product: 'Product',
   AdditionalPrice: 'AdditionalPrice',
-  ProductBatch: 'ProductBatch',
   UnitOfMeasure: 'UnitOfMeasure',
+  CurtainOrder: 'CurtainOrder',
+  CurtainMeasurement: 'CurtainMeasurement',
+  CurtainWorkerLog: 'CurtainWorkerLog',
   Purchase: 'Purchase',
   PurchaseItem: 'PurchaseItem',
   Transfer: 'Transfer',
   TransferItem: 'TransferItem',
   StockCorrection: 'StockCorrection',
   StockCorrectionItem: 'StockCorrectionItem',
-  Sell: 'Sell',
-  SellItem: 'SellItem',
-  SellItemBatch: 'SellItemBatch',
-  AddToCart: 'AddToCart',
-  CartItem: 'CartItem',
-  Waitlist: 'Waitlist',
-  SellStockCorrection: 'SellStockCorrection',
-  SellStockCorrectionItem: 'SellStockCorrectionItem',
-  SellStockCorrectionBatch: 'SellStockCorrectionBatch',
   Notification: 'Notification'
 };
 

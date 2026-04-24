@@ -9,14 +9,13 @@ const checkPermission = require('../middlewares/permission.middleware');
 router.post(
   '/api/purchases',
   auth,
-  //   checkPermission('CREATE_PURCHASE'),
+  checkPermission('CREATE_PURCHASE'),
   purchaseController.createPurchase,
 );
 
 // Get a purchase by ID
 router.get(
   '/api/purchases/:id',
-  auth,
   //   checkPermission('VIEW_PURCHASE'),
   purchaseController.getPurchase,
 );
@@ -41,7 +40,7 @@ router.get(
 router.put(
   '/api/purchases/:id',
   auth,
-  //   checkPermission('UPDATE_PURCHASE'),
+  checkPermission('UPDATE_PURCHASE'),
   purchaseController.updatePurchase,
 );
 router.put(
@@ -55,7 +54,7 @@ router.put(
 router.delete(
   '/api/purchases/:id',
   auth,
-  //   checkPermission('DELETE_PURCHASE'),
+  checkPermission('DELETE_PURCHASE'),
   purchaseController.deletePurchase,
 );
 

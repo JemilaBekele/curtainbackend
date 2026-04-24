@@ -5,7 +5,7 @@ const { productController } = require('../controllers');
 const auth = require('../middlewares/auth');
 const { uploadImage } = require('../utils/multer');
 
-// const checkPermission = require('../middlewares/permission.middleware');
+const checkPermission = require('../middlewares/permission.middleware');
 
 // Create a product
 
@@ -13,7 +13,7 @@ router.post(
   '/api/products',
   auth,
   uploadImage,
-  // checkPermission('CREATE_PRODUCT'),
+  checkPermission('CREATE_PRODUCT'),
   productController.createProduct,
 );
 router.get(
@@ -33,10 +33,10 @@ router.post(
   productController.createProductBatchsingle,
 );
 router.post(
-  '/api/products/:productId/batches',
+  '/api/products/:productId/stocks',
   auth,
-  // checkPermission('CREATE_PRODUCT_BATCH'), // Uncomment if you have permission checks
-  productController.createProductBatch,
+  // checkPermission('CREATE_PRODUCT_STOCK'), // Uncomment if you have permission checks
+  productController.createProductStock,
 );
 router.get(
   '/api/products/get/all/:productId/batches',
@@ -79,7 +79,7 @@ router.put(
   '/api/products/:id',
   auth,
   uploadImage,
-  // checkPermission('UPDATE_PRODUCT'),
+  checkPermission('UPDATE_PRODUCT'),
   productController.updateProduct,
 );
 
@@ -87,7 +87,7 @@ router.put(
 router.delete(
   '/api/products/:id',
   auth,
-  // checkPermission('DELETE_PRODUCT'),
+  checkPermission('DELETE_PRODUCT'),
   productController.deleteProduct,
 );
 router.get(

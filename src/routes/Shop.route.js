@@ -3,15 +3,13 @@ const express = require('express');
 const router = express.Router();
 const { shopController } = require('../controllers');
 const auth = require('../middlewares/auth');
-// const checkPermission = require('../middlewares/permission.middleware');
-
-// Shop Routes
+const checkPermission = require('../middlewares/permission.middleware');
 
 // Create a shop
 router.post(
   '/api/shops',
   auth,
-  // checkPermission('CREATE_SHOP'),
+  checkPermission('CREATE_SHOP'),
   shopController.createShop,
 );
 
@@ -61,7 +59,7 @@ router.get(
 router.put(
   '/api/shops/:id',
   auth,
-  // checkPermission('UPDATE_SHOP'),
+  checkPermission('UPDATE_SHOP'),
   shopController.updateShop,
 );
 
@@ -69,7 +67,7 @@ router.put(
 router.delete(
   '/api/shops/:id',
   auth,
-  // checkPermission('DELETE_SHOP'),
+  checkPermission('DELETE_SHOP'),
   shopController.deleteShop,
 );
 

@@ -4,6 +4,7 @@ const prisma = require('./prisma');
 
 // Get Purchase by ID
 const getPurchaseById = async (id) => {
+  console.log('Fetching purchase by ID:', id);
   const purchase = await prisma.purchase.findUnique({
     where: { id },
     include: {
@@ -14,12 +15,13 @@ const getPurchaseById = async (id) => {
       items: {
         include: {
           product: true,
-          batch: true,
           unitOfMeasure: true, // ✅ Added unit of measure
         },
       },
     },
   });
+  console.log('Purchase fetched by ID:', purchase);
+
   return purchase;
 };
 
@@ -88,6 +90,7 @@ const getAllPurchases = async (filter = {}) => {
 };
 
 // Create Purchase
+// Create Purchase
 const createPurchase = async (purchaseBody, userId) => {
   // Check if invoice number already exists
   if (await getPurchaseByInvoiceNo(purchaseBody.invoiceNo)) {
@@ -109,20 +112,46 @@ const createPurchase = async (purchaseBody, userId) => {
 
   // Validate individual item properties
   items.forEach((item, index) => {
-    if (!item.productId || !item.batchId || !item.unitOfMeasureId) {
+    if (!item.productId || !item.unitOfMeasureId) {
       throw new ApiError(
         httpStatus.BAD_REQUEST,
         `Item ${
           index + 1
-        } is missing required fields (productId, batchId, or unitOfMeasureId)`,
+        } is missing required fields (productId or unitOfMeasureId)`,
       );
     }
-    if (item.quantity <= 0) {
+
+    // Validate quantity - always required
+    if (!item.quantity || item.quantity <= 0) {
       throw new ApiError(
         httpStatus.BAD_REQUEST,
-        `Item ${index + 1} has invalid quantity`,
+        `Item ${
+          index + 1
+        } has invalid quantity. Quantity must be greater than 0.`,
       );
     }
+
+    // Validate dimensions if provided
+    if (item.height !== undefined || item.width !== undefined) {
+      // If either dimension is provided, both must be valid
+      if (!item.height || item.height <= 0) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Item ${
+            index + 1
+          } has invalid height. Height must be greater than 0 when dimensions are provided.`,
+        );
+      }
+      if (!item.width || item.width <= 0) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Item ${
+            index + 1
+          } has invalid width. Width must be greater than 0 when dimensions are provided.`,
+        );
+      }
+    }
+
     if (item.unitPrice < 0) {
       throw new ApiError(
         httpStatus.BAD_REQUEST,
@@ -144,7 +173,7 @@ const createPurchase = async (purchaseBody, userId) => {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid purchase date');
   }
 
-  // Calculate totals (removed totalQuantity as per schema)
+  // Calculate totals
   const totalProducts = validatedItems.length;
   const subTotal = validatedItems.reduce(
     (sum, item) => sum + item.totalPrice,
@@ -167,11 +196,13 @@ const createPurchase = async (purchaseBody, userId) => {
         items: {
           create: validatedItems.map((item) => ({
             productId: item.productId,
-            batchId: item.batchId,
             unitOfMeasureId: item.unitOfMeasureId,
             quantity: item.quantity,
             unitPrice: item.unitPrice,
             totalPrice: item.totalPrice,
+            // Add height and width if they exist
+            ...(item.height !== undefined && { height: item.height }),
+            ...(item.width !== undefined && { width: item.width }),
           })),
         },
       },
@@ -179,7 +210,6 @@ const createPurchase = async (purchaseBody, userId) => {
         items: {
           include: {
             product: true,
-            batch: true,
             unitOfMeasure: true,
           },
         },
@@ -202,6 +232,7 @@ const updatePurchase = async (purchaseId, purchaseBody, userId) => {
   if (!existingPurchase) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Purchase not found');
   }
+
   // Check if current user is the creator of this purchase
   if (existingPurchase.createdById !== userId) {
     throw new ApiError(
@@ -238,20 +269,46 @@ const updatePurchase = async (purchaseId, purchaseBody, userId) => {
 
   // Validate individual item properties
   items.forEach((item, index) => {
-    if (!item.productId || !item.batchId || !item.unitOfMeasureId) {
+    if (!item.productId || !item.unitOfMeasureId) {
       throw new ApiError(
         httpStatus.BAD_REQUEST,
         `Item ${
           index + 1
-        } is missing required fields (productId, batchId, or unitOfMeasureId)`,
+        } is missing required fields (productId or unitOfMeasureId)`,
       );
     }
-    if (item.quantity <= 0) {
+
+    // Validate quantity - always required
+    if (!item.quantity || item.quantity <= 0) {
       throw new ApiError(
         httpStatus.BAD_REQUEST,
-        `Item ${index + 1} has invalid quantity`,
+        `Item ${
+          index + 1
+        } has invalid quantity. Quantity must be greater than 0.`,
       );
     }
+
+    // Validate dimensions if provided
+    if (item.height !== undefined || item.width !== undefined) {
+      // If either dimension is provided, both must be valid
+      if (!item.height || item.height <= 0) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Item ${
+            index + 1
+          } has invalid height. Height must be greater than 0 when dimensions are provided.`,
+        );
+      }
+      if (!item.width || item.width <= 0) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Item ${
+            index + 1
+          } has invalid width. Width must be greater than 0 when dimensions are provided.`,
+        );
+      }
+    }
+
     if (item.unitPrice < 0) {
       throw new ApiError(
         httpStatus.BAD_REQUEST,
@@ -275,7 +332,7 @@ const updatePurchase = async (purchaseId, purchaseBody, userId) => {
     }
   }
 
-  // Calculate totals (removed totalQuantity as per schema)
+  // Calculate totals
   const totalProducts = validatedItems.length;
   const subTotal = validatedItems.reduce(
     (sum, item) => sum + item.totalPrice,
@@ -303,14 +360,17 @@ const updatePurchase = async (purchaseId, purchaseBody, userId) => {
         totalProducts,
         subTotal,
         grandTotal,
+        updatedById: userId, // Add updated by user ID here
         items: {
           create: validatedItems.map((item) => ({
             productId: item.productId,
-            batchId: item.batchId,
             unitOfMeasureId: item.unitOfMeasureId,
             quantity: item.quantity,
             unitPrice: item.unitPrice,
             totalPrice: item.totalPrice,
+            // Add height and width if they exist
+            ...(item.height !== undefined && { height: item.height }),
+            ...(item.width !== undefined && { width: item.width }),
           })),
         },
       },
@@ -318,12 +378,13 @@ const updatePurchase = async (purchaseId, purchaseBody, userId) => {
         items: {
           include: {
             product: true,
-            batch: true,
             unitOfMeasure: true,
           },
         },
         supplier: true,
         store: true,
+        createdBy: true,
+        updatedBy: true,
       },
     });
 
@@ -358,23 +419,11 @@ const deletePurchase = async (id, userId) => {
 
         // Only reverse stock operations if purchase was approved
         if (wasApproved) {
-          // 1. Update ProductBatch stock
-          operations.push(
-            tx.productBatch.update({
-              where: { id: item.batchId },
-              data: {
-                stock: {
-                  decrement: item.quantity,
-                },
-              },
-            }),
-          );
-
-          // 2. Create reversal stock ledger entry
+          // 1. Create reversal stock ledger entry
           operations.push(
             tx.stockLedger.create({
               data: {
-                batchId: item.batchId,
+                productId: item.productId,
                 storeId: existingPurchase.storeId,
                 movementType: 'OUT',
                 quantity: item.quantity,
@@ -387,12 +436,12 @@ const deletePurchase = async (id, userId) => {
             }),
           );
 
-          // 3. Update StoreStock
+          // 2. Update StoreStock (no batch relation anymore)
           const existingStoreStock = await tx.storeStock.findUnique({
             where: {
-              storeId_batchId: {
+              storeId_productId: {
                 storeId: existingPurchase.storeId,
-                batchId: item.batchId,
+                productId: item.productId,
               },
             },
           });
@@ -405,9 +454,9 @@ const deletePurchase = async (id, userId) => {
               operations.push(
                 tx.storeStock.delete({
                   where: {
-                    storeId_batchId: {
+                    storeId_productId: {
                       storeId: existingPurchase.storeId,
-                      batchId: item.batchId,
+                      productId: item.productId,
                     },
                   },
                 }),
@@ -417,9 +466,9 @@ const deletePurchase = async (id, userId) => {
               operations.push(
                 tx.storeStock.update({
                   where: {
-                    storeId_batchId: {
+                    storeId_productId: {
                       storeId: existingPurchase.storeId,
-                      batchId: item.batchId,
+                      productId: item.productId,
                     },
                   },
                   data: {
@@ -463,6 +512,7 @@ const deletePurchase = async (id, userId) => {
 
   return { message: 'Purchase deleted successfully' };
 };
+
 const acceptPurchase = async (purchaseId, paymentStatus, userId) => {
   try {
     const purchase = await prisma.purchase.findUnique({
@@ -470,7 +520,7 @@ const acceptPurchase = async (purchaseId, paymentStatus, userId) => {
       include: {
         items: {
           include: {
-            batch: true,
+            product: true,
             unitOfMeasure: true,
           },
         },
@@ -503,69 +553,130 @@ const acceptPurchase = async (purchaseId, paymentStatus, userId) => {
       },
     });
 
-    // Only create stock for fully paid purchases
+    // Only create stock for approved purchases
     if (paymentStatus === 'APPROVED') {
-      const result = await prisma.$transaction(async (tx) => {
-        // Get all existing store stocks in one query
-        const batchIds = purchase.items.map((item) => item.batchId);
-        const existingStoreStocks = await tx.storeStock.findMany({
-          where: {
-            storeId: purchase.storeId,
-            batchId: { in: batchIds },
-          },
-        });
+      const result = await prisma.$transaction(
+        async (tx) => {
+          // First, create/update all store stocks and variants
+          const stockPromises = purchase.items.map(async (item) => {
+            const { productId, quantity, unitOfMeasureId, height, width } =
+              item;
 
-        const existingStoreStockMap = existingStoreStocks.reduce(
-          (acc, stock) => {
-            acc[stock.batchId] = stock;
-            return acc;
-          },
-          {},
-        );
+            // Validate quantity
+            if (quantity <= 0) {
+              throw new ApiError(
+                httpStatus.BAD_REQUEST,
+                `Invalid quantity for item ${item.id || productId}`,
+              );
+            }
 
-        // Prepare all operations
-        const storeStockOperations = [];
-        const stockLedgerOperations = [];
-        const batchUpdateOperations = [];
+            // Check if this is a dimension-based item
+            const isDimensionBased =
+              height != null && width != null && height > 0 && width > 0;
 
-        purchase.items.forEach((item) => {
-          const { quantity, unitOfMeasureId, batchId } = item;
+            // Validate dimensions for dimension-based items
+            if (isDimensionBased) {
+              if (height <= 0 || width <= 0) {
+                throw new ApiError(
+                  httpStatus.BAD_REQUEST,
+                  `Invalid dimensions for item ${
+                    item.id || productId
+                  }: height and width must be positive numbers`,
+                );
+              }
+            }
 
-          // Store stock operations
-          const existingStoreStock = existingStoreStockMap[batchId];
-          if (existingStoreStock) {
-            // Update existing store stock
-            storeStockOperations.push(
-              tx.storeStock.update({
-                where: { id: existingStoreStock.id },
-                data: {
-                  quantity: { increment: quantity },
-                  // Ensure status remains Available when updating
-                  status: 'Available',
-                  unitOfMeasureId,
-                },
-              }),
-            );
-          } else {
-            // Create new store stock with Available status
-            storeStockOperations.push(
-              tx.storeStock.create({
-                data: {
+            // Find or create the main store stock record
+            const mainStoreStock = await tx.storeStock.upsert({
+              where: {
+                storeId_productId: {
                   storeId: purchase.storeId,
-                  batchId,
-                  quantity,
-                  status: 'Available',
-                  unitOfMeasureId,
+                  productId,
                 },
-              }),
-            );
-          }
+              },
+              create: {
+                storeId: purchase.storeId,
+                productId,
+                quantity: 0,
+                unitOfMeasureId,
+                status: 'Available',
+              },
+              update: {}, // Don't update anything on conflict
+            });
 
-          // Stock ledger operations
-          stockLedgerOperations.push(
-            tx.stockLedger.create({
+            if (isDimensionBased) {
+              // Handle dimension-based item
+              // Use findUnique with composite unique constraint instead of findFirst for better performance
+              const existingVariant = await tx.storeProductVariant.findUnique({
+                where: {
+                  storeStockId_height_width: {
+                    storeStockId: mainStoreStock.id,
+                    height,
+                    width,
+                  },
+                },
+              });
+
+              if (existingVariant) {
+                // Update existing variant
+                await tx.storeProductVariant.update({
+                  where: { id: existingVariant.id },
+                  data: {
+                    quantity: {
+                      increment: quantity,
+                    },
+                  },
+                });
+              } else {
+                // Create new variant
+                await tx.storeProductVariant.create({
+                  data: {
+                    storeStockId: mainStoreStock.id,
+                    height,
+                    width,
+                    quantity,
+                  },
+                });
+              }
+
+              // Create stock ledger entry with dimensions
+              await tx.stockLedger.create({
+                data: {
+                  productId,
+                  storeId: purchase.storeId,
+                  movementType: 'IN',
+                  height,
+                  width,
+                  quantity,
+                  unitOfMeasureId,
+                  reference: purchase.invoiceNo,
+                  userId,
+                  notes: `Purchase acceptance - ${purchase.invoiceNo} - Added ${quantity} piece(s) (${height}x${width})`,
+                  movementDate: purchase.purchaseDate || new Date(),
+                },
+              });
+
+              return {
+                storeStockId: mainStoreStock.id,
+                isDimensionBased: true,
+                variantCount: 1,
+              };
+            }
+
+            // Handle quantity-based item (no dimensions)
+            await tx.storeStock.update({
+              where: { id: mainStoreStock.id },
               data: {
-                batchId,
+                quantity: {
+                  increment: quantity,
+                },
+              },
+            });
+
+            // Create stock ledger entry without dimensions
+            await tx.stockLedger.create({
+              data: {
+                productId,
                 storeId: purchase.storeId,
                 movementType: 'IN',
                 quantity,
@@ -573,50 +684,115 @@ const acceptPurchase = async (purchaseId, paymentStatus, userId) => {
                 reference: purchase.invoiceNo,
                 userId,
                 notes: `Purchase acceptance - ${purchase.invoiceNo}`,
-                movementDate: purchase.purchaseDate,
+                movementDate: purchase.purchaseDate || new Date(),
               },
-            }),
-          );
+            });
 
-          // Batch update operations - increment batch stock
-          batchUpdateOperations.push(
-            tx.productBatch.update({
-              where: { id: batchId },
-              data: {
-                stock: { increment: quantity },
+            return {
+              storeStockId: mainStoreStock.id,
+              isDimensionBased: false,
+              variantCount: 0,
+            };
+          });
+
+          // Execute all stock operations
+          const stockResults = await Promise.all(stockPromises);
+
+          // Get unique store stock IDs that had dimension-based updates
+          const dimensionStoreStockIds = [
+            ...new Set(
+              stockResults
+                .filter((result) => result.isDimensionBased)
+                .map((result) => result.storeStockId),
+            ),
+          ];
+
+          // Update total quantities for store stocks that had dimension variants
+          if (dimensionStoreStockIds.length > 0) {
+            const updateTotalPromises = dimensionStoreStockIds.map(
+              async (stockId) => {
+                // Get all variants for this store stock
+                const variants = await tx.storeProductVariant.findMany({
+                  where: { storeStockId: stockId },
+                });
+
+                // Calculate total quantity from all variants
+                const totalQuantity = variants.reduce(
+                  (sum, v) => sum + v.quantity,
+                  0,
+                );
+
+                // Update the main store stock total quantity
+                await tx.storeStock.update({
+                  where: { id: stockId },
+                  data: { quantity: totalQuantity },
+                });
+
+                return { stockId, totalQuantity };
               },
-            }),
-          );
-        });
+            );
 
-        // Execute all operations in parallel
-        const [storeStockUpdates, stockLedgerEntries, batchUpdates] =
-          await Promise.all([
-            Promise.all(storeStockOperations),
-            Promise.all(stockLedgerOperations),
-            Promise.all(batchUpdateOperations),
-          ]);
+            await Promise.all(updateTotalPromises);
+          }
 
-        // Create log entry
-        await tx.log.create({
-          data: {
-            action: `Accepted purchase ${purchase.invoiceNo} with ${purchase.items.length} items`,
-            userId,
-          },
-        });
+          // Create log entry
+          await tx.log.create({
+            data: {
+              action: `Accepted purchase ${purchase.invoiceNo} with ${purchase.items.length} items. Payment status: ${paymentStatus}`,
+              userId,
+            },
+          });
 
-        return {
-          purchase: updatedPurchase,
-          stockLedgerEntries,
-          storeStockUpdates,
-          batchUpdates,
-        };
-      });
+          // Fetch updated store stocks with variants for response
+          const updatedStoreStocks = await tx.storeStock.findMany({
+            where: {
+              storeId: purchase.storeId,
+              productId: {
+                in: purchase.items.map((item) => item.productId),
+              },
+            },
+            include: {
+              variants: {
+                orderBy: [{ height: 'asc' }, { width: 'asc' }],
+              },
+            },
+          });
+
+          // Get all stock ledger entries created
+          const stockLedgerEntries = await tx.stockLedger.findMany({
+            where: {
+              reference: purchase.invoiceNo,
+              movementType: 'IN',
+            },
+            orderBy: {
+              createdAt: 'asc',
+            },
+          });
+
+          return {
+            purchase: updatedPurchase,
+            stockLedgerEntries,
+            storeStockUpdates: updatedStoreStocks,
+            summary: {
+              totalItems: purchase.items.length,
+              dimensionBasedItems: stockResults.filter(
+                (r) => r.isDimensionBased,
+              ).length,
+              quantityBasedItems: stockResults.filter(
+                (r) => !r.isDimensionBased,
+              ).length,
+            },
+          };
+        },
+        {
+          timeout: 10000, // 10 second timeout for large purchases
+        },
+      );
 
       return result;
     }
 
-    // For non-PAID status, just update the payment status and return
+    // For non-APPROVED status, just update the payment status and return
     await prisma.log.create({
       data: {
         action: `Updated payment status of purchase ${purchase.invoiceNo} to ${paymentStatus}`,
@@ -626,17 +802,40 @@ const acceptPurchase = async (purchaseId, paymentStatus, userId) => {
 
     return {
       purchase: updatedPurchase,
-      message: `Payment status updated to ${paymentStatus}. No stock created as purchase is not fully paid.`,
+      message: `Payment status updated to ${paymentStatus}. No stock created as purchase is not approved.`,
     };
   } catch (error) {
-    // Handle transaction errors specifically
+    // Handle specific Prisma errors
+    if (error.code === 'P2002') {
+      throw new ApiError(
+        httpStatus.CONFLICT,
+        'Unique constraint violation. This might indicate a duplicate variant.',
+      );
+    }
     if (error.code === 'P2025') {
       throw new ApiError(
         httpStatus.NOT_FOUND,
         'Related record not found during transaction',
       );
     }
-    throw error;
+    if (error.code === 'P2034') {
+      throw new ApiError(
+        httpStatus.INTERNAL_SERVER_ERROR,
+        'Transaction failed due to a conflict. Please try again.',
+      );
+    }
+
+    // Re-throw ApiError instances
+    if (error instanceof ApiError) {
+      throw error;
+    }
+
+    // Log unexpected errors
+    console.error('Unexpected error in acceptPurchase:', error);
+    throw new ApiError(
+      httpStatus.INTERNAL_SERVER_ERROR,
+      'An unexpected error occurred while accepting the purchase',
+    );
   }
 };
 module.exports = {

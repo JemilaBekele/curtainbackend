@@ -5,13 +5,13 @@ const router = express.Router();
 // const { userValidation } = require('../validations');
 const { authController } = require('../controllers');
 const auth = require('../middlewares/auth');
-// const checkPermission = require('../middlewares/permission.middleware');
+const checkPermission = require('../middlewares/permission.middleware');
 
 // User management routes
 router.post(
   '/api/register',
   auth,
-  // checkPermission('CREATE_USER'),
+  checkPermission('CREATE_Employee'),
   // validate(userValidation.createUserSchema),
   authController.createUser,
 );
@@ -39,26 +39,27 @@ router.get(
 router.put(
   '/api/users/:userId',
   auth,
-  // checkPermission('UPDATE_USER'),
+  checkPermission('UPDATE_Employee'),
   // validate(userValidation.updateUserSchema),
   authController.updateUser,
 );
 router.patch(
   '/api/users/change-password',
   auth,
+  checkPermission('CHANGE_USER_PASSWORD'),
   authController.changeUserPassword,
 );
 router.delete(
   '/api/users/:userId',
   auth,
-  // checkPermission('DELETE_USER'),
+  checkPermission('DELETE_Employee'),
   authController.deleteUser,
 );
 
 router.put(
   '/api/users/:userId/status',
   auth,
-  // checkPermission('UPDATE_USER_STATUS'),
+  checkPermission('UPDATE_USER_STATUS'),
   // validate(userValidation.changeStatusSchema),
   authController.changeUserStatus,
 );
