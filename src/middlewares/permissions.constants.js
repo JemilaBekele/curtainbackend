@@ -62,10 +62,10 @@ module.exports = {
     VIEW_DASHBOARD: {
       name: 'VIEW_SYSTEM_DASHBOARD',
     },
-    CREATE: { name: 'CREATE_BRANCH' },
-    VIEW_ALL: { name: 'VIEW_ALL_BRANCHES' },
-    UPDATE: { name: 'UPDATE_BRANCH' },
-    DELETE: { name: 'DELETE_BRANCH' },
+    CREATE: { name: 'CREATE_BRANCH', description: 'Create new branches' },
+    VIEW_ALL: { name: 'VIEW_ALL_BRANCHES', description: 'View all branches' },
+    UPDATE: { name: 'UPDATE_BRANCH', description: 'Update branch information' },
+    DELETE: { name: 'DELETE_BRANCH', description: 'Delete branches' },
   },
   CATEGORY: {
     CREATE: { name: 'CREATE_CATEGORY' },
@@ -91,7 +91,6 @@ module.exports = {
       name: 'DELETE_COLOUR',
     },
   },
-
   CURTAIN_ORDER: {
     CREATE: { name: 'CREATE_CURTAIN_ORDER' },
     VIEW_ALL: { name: 'VIEW_ALL_CURTAIN_ORDERS' },
@@ -231,7 +230,6 @@ module.exports = {
       name: 'DELETE_UNIT_OF_MEASURE',
     },
   },
-
   TRANSFER: {
     CREATE: {
       name: 'CREATE_TRANSFER',
